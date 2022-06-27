@@ -3,10 +3,10 @@ package com.jiaoay.expandabletextview
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.res.Resources
-import android.text.SpannableString
 import android.util.TypedValue
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import com.jiaoay.expandabletextview.widget.ExpandableTextView
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 
@@ -53,40 +53,19 @@ val Context.scope: CoroutineScope
 		return toActivity?.lifecycleScope ?: mainScope
 	}
 
-inline fun ExpandableTextView.setContent(
-	text: String?,
-	expanded: Boolean,
-	crossinline buildSpannable: ((SpannableString) -> Unit)
-) {
-	contentText = text
-	expandableCallback = object : ExpandableTextView.Callback {
-		override fun onExpandClick() {
-			changeExpendState(expandState.not())
-		}
-
-		override fun onFoldClick() {
-			changeExpendState(expandState.not())
-		}
-	}
-	spannableBuildExtension = {
-		buildSpannable(it)
-	}
-	changeExpendState(expanded)
-}
-
 fun ExpandableTextView.setContent(
-	text: String?,
-	expanded: Boolean
+	content: CharSequence,
+	expandState: Boolean
 ) {
-	contentText = text
+	contentText = content
 	expandableCallback = object : ExpandableTextView.Callback {
 		override fun onExpandClick() {
-			changeExpendState(expandState.not())
+			changeExpendState(this@setContent.expandState.not())
 		}
 
 		override fun onFoldClick() {
-			changeExpendState(expandState.not())
+			changeExpendState(this@setContent.expandState.not())
 		}
 	}
-	changeExpendState(expanded)
+	changeExpendState(expandState)
 }
