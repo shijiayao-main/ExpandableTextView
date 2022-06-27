@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <declare-styleable name="ExpandableTextView">
+        <attr name="expand_icon" format="reference" />
+        <attr name="fold_icon" format="reference" />
+        <attr name="max_expand_line" format="integer" />
+    </declare-styleable>
+</resources>
