@@ -36,6 +36,12 @@ class ExpandableTextView @JvmOverloads constructor(
     var expandState: Boolean = false
 
     var contentText: CharSequence = ""
+        set(value) {
+            if (value != field) {
+                viewSizeMap.clear()
+            }
+            field = value
+        }
 
     var maxLineCount = 3
 
@@ -96,6 +102,17 @@ class ExpandableTextView @JvmOverloads constructor(
 
     private var iconDrawable: Drawable? = null
 
+    private var viewSizeMap: HashMap<Int, ExpandableViewInfo> = HashMap()
+
+    private fun getKey(): Int {
+        return "${contentText.hashCode()}$measuredWidth$expandState".hashCode()
+    }
+
+    override fun onDetachedFromWindow() {
+        viewSizeMap.clear()
+        super.onDetachedFromWindow()
+    }
+
     @SuppressLint("DrawAllocation")
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         super.onMeasure(widthMeasureSpec, heightMeasureSpec)
@@ -109,6 +126,15 @@ class ExpandableTextView @JvmOverloads constructor(
         if (contentText.isEmpty()) {
             return
         }
+
+        val key = getKey()
+        viewSizeMap[key]?.let { value ->
+            iconRect.set(value.iconRect)
+            setMeasuredDimension(measuredWidth, value.height)
+            setText(value.charSequence, BufferType.SPANNABLE)
+            return
+        }
+
         context.scope.launch {
             val staticLayout = getStaticLayout(text = contentText)
             val result = if (staticLayout.lineCount > maxLineCount) {
@@ -120,11 +146,16 @@ class ExpandableTextView @JvmOverloads constructor(
                 }
             } else {
                 expandableCallback?.onLoss()
-                // 重新计算高度
-                setMeasuredDimension(measuredWidth, staticLayout.height)
-                SpannableString(contentText)
+                ExpandableViewInfo(
+                    charSequence = contentText,
+                    height = staticLayout.height,
+                    iconRect = RectF()
+                )
             }
-            setText(result, BufferType.SPANNABLE)
+            iconRect.set(result.iconRect)
+            viewSizeMap[key] = result
+            setMeasuredDimension(measuredWidth, result.height)
+            setText(result.charSequence, BufferType.SPANNABLE)
         }
     }
 
@@ -158,7 +189,9 @@ class ExpandableTextView @JvmOverloads constructor(
         return usedWidth
     }
 
-    private suspend fun onBuildExpendText(staticLayout: StaticLayout): SpannableStringBuilder {
+    private suspend fun onBuildExpendText(
+        staticLayout: StaticLayout
+    ): ExpandableViewInfo {
         val lineCount = maxLineCount
 
         val usedWidth = getUsedWidth()
@@ -212,17 +245,17 @@ class ExpandableTextView @JvmOverloads constructor(
                 lineTextWidth + paddingLeft + (iconDrawable?.bounds?.width()
                     ?: 0) + expandableType.iconPaddingLeft
         }
-        iconRect.set(iconLeft, iconTop, iconRight, iconBottom)
-
         expandableCallback?.onCollapse()
-        // 重新计算高度
-        setMeasuredDimension(measuredWidth, newStaticLayout.height)
-        return newText
+        return ExpandableViewInfo(
+            charSequence = newText,
+            height = newStaticLayout.height,
+            iconRect = RectF(iconLeft, iconTop, iconRight, iconBottom)
+        )
     }
 
     private fun onBuildFoldText(
         staticLayout: StaticLayout,
-    ): CharSequence {
+    ): ExpandableViewInfo {
 
         val usedWidth = getUsedWidth()
 
@@ -240,11 +273,14 @@ class ExpandableTextView @JvmOverloads constructor(
         val lineTextWidth = lastLineStaticLayout.getLineWidth(0)
         val lineTextHeight = lastLineStaticLayout.height
         val textHeight: Int
+
+        val iconLeft: Float
+        val iconTop: Float
+        val iconRight: Float
+        val iconBottom: Float
         if ((lineTextWidth + usedWidth) > measuredWidth) {
-            val iconTop = staticLayout.height.toFloat()
-            val iconBottom = (staticLayout.height + lineTextHeight).toFloat()
-            val iconLeft: Float
-            val iconRight: Float
+            iconTop = staticLayout.height.toFloat()
+            iconBottom = (staticLayout.height + lineTextHeight).toFloat()
             // TODO:
             if (gravity == Gravity.TOP or Gravity.CENTER_HORIZONTAL) {
                 val spaceWidth =
@@ -263,12 +299,9 @@ class ExpandableTextView @JvmOverloads constructor(
             textHeight = staticLayout.height + lineTextHeight.coerceAtLeast(
                 iconDrawable?.bounds?.height() ?: 0
             )
-            iconRect.set(iconLeft, iconTop, iconRight, iconBottom)
         } else {
-            val iconTop = (staticLayout.height - lineTextHeight).toFloat()
-            val iconBottom = staticLayout.height.toFloat()
-            val iconLeft: Float
-            val iconRight: Float
+            iconTop = (staticLayout.height - lineTextHeight).toFloat()
+            iconBottom = staticLayout.height.toFloat()
             // TODO:
             if (gravity == Gravity.TOP or Gravity.CENTER_HORIZONTAL) {
                 val spaceLeft = (measuredWidth - lineTextWidth - paddingLeft - paddingRight) / 2
@@ -281,11 +314,13 @@ class ExpandableTextView @JvmOverloads constructor(
                     ?: 0) + expandableType.iconPaddingLeft
             }
             textHeight = staticLayout.height
-            iconRect.set(iconLeft, iconTop, iconRight, iconBottom)
         }
         expandableCallback?.onExpand()
-        setMeasuredDimension(measuredWidth, textHeight)
-        return contentText
+        return ExpandableViewInfo(
+            charSequence = contentText,
+            height = textHeight,
+            iconRect = RectF(iconLeft, iconTop, iconRight, iconBottom)
+        )
     }
 
     private val iconPaint = Paint().apply {
@@ -339,7 +374,7 @@ class ExpandableTextView @JvmOverloads constructor(
                 lastY = event.getY(0)
             }
             MotionEvent.ACTION_UP -> {
-                if (iconRect.contains(lastX, lastY) && iconRect.contains(
+                if (iconRect.xYInIconRect(lastX, lastY) && iconRect.xYInIconRect(
                         event.getX(0),
                         event.getY(0)
                     )
@@ -357,6 +392,15 @@ class ExpandableTextView @JvmOverloads constructor(
             }
         }
         return false
+    }
+
+    private fun RectF.xYInIconRect(x: Float, y: Float): Boolean {
+        val isLegal = left < right && top < bottom
+         return isLegal&&
+                x >= (left - 10.dp2px) &&
+                x < (right + 10.dp2px) &&
+                y >= (top - 10.dp2px) &&
+                y < (bottom + 10.dp2px)
     }
 
     override fun setOnClickListener(l: OnClickListener?) {

@@ -1,5 +1,6 @@
 package com.jiaoay.expandabletextview.widget
 
+import android.graphics.RectF
 import androidx.annotation.ColorRes
 import androidx.annotation.DrawableRes
 
@@ -21,3 +22,9 @@ class ExpandableTextIcon(
     @ColorRes val foldTextColor: Int = 0,
     iconPaddingLeft: Int = 0
 ) : ExpandableIconType(iconPaddingLeft)
+
+data class ExpandableViewInfo(
+    val charSequence: CharSequence,
+    val height: Int,
+    val iconRect: RectF
+)
