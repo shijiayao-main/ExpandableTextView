@@ -296,7 +296,7 @@ class ExpandableTextView @JvmOverloads constructor(
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        canvas.drawRect(iconRect, iconPaint)
+//        canvas.drawRect(iconRect, iconPaint)
         canvas.save()
         val iconTop = iconDrawable?.bounds?.height()?.let {
             iconRect.height() - it
