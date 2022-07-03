@@ -6,6 +6,7 @@ import android.content.res.Resources
 import android.util.TypedValue
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import com.jiaoay.expandabletextview.widget.ExpandableIconType
 import com.jiaoay.expandabletextview.widget.ExpandableTextView
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -55,8 +56,10 @@ val Context.scope: CoroutineScope
 
 fun ExpandableTextView.setContent(
 	content: CharSequence,
+	iconType: ExpandableIconType,
 	expandState: Boolean
 ) {
+	expandableType = iconType
 	contentText = content
 	expandableCallback = object : ExpandableTextView.Callback {
 		override fun onExpandClick() {

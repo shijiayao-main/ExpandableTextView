@@ -2,26 +2,23 @@ package com.jiaoay.expandabletextview.widget
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.drawable.Drawable
 import android.os.Build
-import android.text.Layout
-import android.text.Spannable
-import android.text.SpannableString
-import android.text.SpannableStringBuilder
-import android.text.StaticLayout
+import android.text.*
 import android.text.method.LinkMovementMethod
 import android.util.AttributeSet
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.View.OnClickListener
-import androidx.annotation.DrawableRes
 import androidx.appcompat.widget.AppCompatTextView
 import androidx.core.content.ContextCompat
 import androidx.core.content.res.ResourcesCompat
+import androidx.core.graphics.drawable.toDrawable
 import com.jiaoay.expandabletextview.R
 import com.jiaoay.expandabletextview.dp2px
 import com.jiaoay.expandabletextview.scope
@@ -30,387 +27,450 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class ExpandableTextView @JvmOverloads constructor(
-	context: Context,
-	attrs: AttributeSet? = null
+    context: Context,
+    attrs: AttributeSet? = null
 ) : AppCompatTextView(context, attrs), OnClickListener {
 
-	var expandableCallback: Callback? = null
+    var expandableCallback: Callback? = null
 
-	var expandState: Boolean = false
+    var expandState: Boolean = false
 
-	var contentText: CharSequence = ""
+    var contentText: CharSequence = ""
 
-	var maxLineCount = 3
+    var maxLineCount = 3
 
-	private val ellipsizeText = "…"
+    private val ellipsizeText = "…"
 
-	private var iconPaddingLeft: Int = 8.dp2px
+    var expandableType: ExpandableIconType = ExpandableTextIcon(
+        expandText = "[展开]",
+        foldText = "[收起]"
+    )
 
-	@DrawableRes
-	private var expandTextIcon: Int = R.drawable.ic_expand_down
+    // fix click span
+    private var preventClick = false
+    private var clickListener: OnClickListener? = null
+    var ignoreSpannableClick = false
+        private set
 
-	@DrawableRes
-	private var foldTextIcon: Int = R.drawable.ic_fold_up
+    private val iconRect: RectF = RectF()
 
-	// fix click span
-	private var preventClick = false
-	private var clickListener: OnClickListener? = null
-	var ignoreSpannableClick = false
-		private set
+    init {
+        movementMethod = LinkMovementMethod.getInstance()
+        attrs?.let {
+            val typedArray = context.obtainStyledAttributes(it, R.styleable.ExpandableTextView)
+            maxLineCount =
+                typedArray.getInt(R.styleable.ExpandableTextView_max_expand_line, 3)
+            typedArray.recycle()
+        }
+    }
 
-	private val iconRect: RectF = RectF()
+    private fun getStaticLayout(text: CharSequence): StaticLayout {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            StaticLayout.Builder
+                .obtain(
+                    text,
+                    0,
+                    text.length,
+                    paint,
+                    measuredWidth
+                ).apply {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                        setUseLineSpacingFromFallbacks(isFallbackLineSpacing)
+                    }
+                }
+                .setAlignment(Layout.Alignment.ALIGN_CENTER)
+                .setLineSpacing(lineSpacingExtra, lineSpacingMultiplier)
+                .build()
+        } else {
+            StaticLayout(
+                text,
+                paint,
+                measuredWidth,
+                Layout.Alignment.ALIGN_CENTER,
+                lineSpacingMultiplier,
+                lineSpacingExtra,
+                true
+            )
+        }
+    }
 
-	init {
-		movementMethod = LinkMovementMethod.getInstance()
-		attrs?.let {
-			val typedArray = context.obtainStyledAttributes(it, R.styleable.ExpandableTextView)
-			expandTextIcon = typedArray
-				.getResourceId(
-					R.styleable.ExpandableTextView_expand_icon,
-					R.drawable.ic_expand_down
-				)
-			foldTextIcon = typedArray
-				.getResourceId(
-					R.styleable.ExpandableTextView_fold_icon,
-					R.drawable.ic_fold_up
-				)
-			maxLineCount =
-				typedArray.getInt(R.styleable.ExpandableTextView_max_expand_line, 3)
-			typedArray.recycle()
-		}
-	}
+    private var iconDrawable: Drawable? = null
 
-	private fun getStaticLayout(text: CharSequence): StaticLayout {
-		return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-			StaticLayout.Builder
-				.obtain(
-					text,
-					0,
-					text.length,
-					paint,
-					measuredWidth
-				).apply {
-					if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-						setUseLineSpacingFromFallbacks(isFallbackLineSpacing)
-					}
-				}
-				.setAlignment(Layout.Alignment.ALIGN_CENTER)
-				.setLineSpacing(lineSpacingExtra, lineSpacingMultiplier)
-				.build()
-		} else {
-			StaticLayout(
-				text,
-				paint,
-				measuredWidth,
-				Layout.Alignment.ALIGN_CENTER,
-				lineSpacingMultiplier,
-				lineSpacingExtra,
-				true
-			)
-		}
-	}
+    @SuppressLint("DrawAllocation")
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        super.onMeasure(widthMeasureSpec, heightMeasureSpec)
 
-	private var iconDrawable: Drawable? = null
+        if (measuredWidth == 0) {
+            setMeasuredDimension(widthMeasureSpec, heightMeasureSpec)
+            if (measuredWidth == 0) {
+                return
+            }
+        }
+        if (contentText.isEmpty()) {
+            return
+        }
+        context.scope.launch {
+            val staticLayout = getStaticLayout(text = contentText)
+            val result = if (staticLayout.lineCount > maxLineCount) {
+                if (expandState) {
+                    onBuildFoldText(staticLayout = staticLayout)
+                } else {
+                    // 最终显示的文字
+                    onBuildExpendText(staticLayout = staticLayout)
+                }
+            } else {
+                expandableCallback?.onLoss()
+                // 重新计算高度
+                setMeasuredDimension(measuredWidth, staticLayout.height)
+                SpannableString(contentText)
+            }
+            setText(result, BufferType.SPANNABLE)
+        }
+    }
 
-	@SuppressLint("DrawAllocation")
-	override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-		super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+    private suspend fun getEndTextIndex(lineText: CharSequence, usedWidth: Float): Int =
+        withContext(Dispatchers.IO) {
+            for (i in lineText.length - 1 downTo 0) {
+                val str = lineText.subSequence(i, lineText.length)
+                val strWidth = getStaticLayout(str).getLineWidth(0)
+                if (strWidth >= usedWidth) {
+                    if (i > 1) {
+                        val secondChar = lineText[i]
+                        val firstChar = lineText[i - 1]
+                        if (Character.isSurrogatePair(firstChar, secondChar)) {
+                            return@withContext i - 1
+                        }
+                    }
+                    return@withContext i
+                }
+            }
+            return@withContext lineText.length - 1
+        }
 
-		if (measuredWidth == 0) {
-			setMeasuredDimension(widthMeasureSpec, heightMeasureSpec)
-			if (measuredWidth == 0) {
-				return
-			}
-		}
-		if (contentText.isEmpty()) {
-			return
-		}
-		measureText()
-	}
+    // TODO: gravity == Gravity.TOP or Gravity.CENTER_HORIZONTAL
+    private fun getUsedWidth(): Float {
+        val ellipsizeTextWidth = paint.measureText(ellipsizeText)
+        val drawableWidth = iconDrawable?.bounds?.width()?.toFloat() ?: 0f
+        var usedWidth = drawableWidth + ellipsizeTextWidth + expandableType.iconPaddingLeft
+        if (gravity == Gravity.TOP or Gravity.CENTER_HORIZONTAL) {
+            usedWidth *= 2
+        }
+        return usedWidth
+    }
 
-	private fun initDrawable(@DrawableRes iconResource: Int): Drawable? {
-		val textHeight = paint.fontMetrics.descent - paint.fontMetrics.ascent
-		return ResourcesCompat.getDrawable(resources, iconResource, context.theme)?.apply {
-			var iconWidth: Float = intrinsicWidth.toFloat()
-			var iconHeight: Float = intrinsicHeight.toFloat()
-			if (iconHeight > textHeight) {
-				iconWidth *= (textHeight / iconHeight)
-				iconHeight = textHeight
-			}
-			setBounds(
-				0,
-				0,
-				iconWidth.toInt(),
-				iconHeight.toInt()
-			)
-		}
-	}
+    private suspend fun onBuildExpendText(staticLayout: StaticLayout): SpannableStringBuilder {
+        val lineCount = maxLineCount
 
-	private suspend fun getEndTextIndex(lineText: CharSequence, usedWidth: Float): Int = withContext(Dispatchers.IO) {
-		for (i in lineText.length - 1 downTo 0) {
-			val str = lineText.subSequence(i, lineText.length)
-			val strWidth = getStaticLayout(str).getLineWidth(0)
-			if (strWidth >= usedWidth) {
-				if (i > 1) {
-					val secondChar = lineText[i]
-					val firstChar = lineText[i - 1]
-					if (Character.isSurrogatePair(firstChar, secondChar)) {
-						return@withContext i - 1
-					}
-				}
-				return@withContext i
-			}
-		}
-		return@withContext lineText.length - 1
-	}
+        val usedWidth = getUsedWidth()
 
-	// TODO: gravity == Gravity.TOP or Gravity.CENTER_HORIZONTAL
-	private fun getUsedWidth(): Float {
-		val ellipsizeTextWidth = paint.measureText(ellipsizeText)
-		val drawableWidth = iconDrawable?.bounds?.width()?.toFloat() ?: 0f
-		var usedWidth = drawableWidth + ellipsizeTextWidth + iconPaddingLeft
-		if (gravity == Gravity.TOP or Gravity.CENTER_HORIZONTAL) {
-			usedWidth *= 2
-		}
-		return usedWidth
-	}
+        val start = staticLayout.getLineStart(lineCount - 1)
+        val end = staticLayout.getLineEnd(lineCount - 1)
+        val lineTextSpannable = contentText
+            .subSequence(start, end)
+            .removeSuffix("\r\n")
+            .removeSuffix("\n")
 
-	private suspend fun onBuildExpendText(staticLayout: StaticLayout): SpannableStringBuilder {
-		val lineCount = maxLineCount
-		iconDrawable = initDrawable(expandTextIcon)
+        val newText = SpannableStringBuilder()
 
-		val usedWidth = getUsedWidth()
+        val lineStaticLayout = getStaticLayout(lineTextSpannable)
+        val lineWidth = lineStaticLayout.getLineWidth(0)
+        val lineHeight = lineStaticLayout.height
+        val lineTextWidth: Float
+        if ((lineWidth + usedWidth) > measuredWidth) {
+            val endIndex = getEndTextIndex(lineText = lineTextSpannable, usedWidth = usedWidth)
+            lineTextWidth = getStaticLayout(
+                lineTextSpannable.subSequence(
+                    0,
+                    endIndex
+                )
+            ).getLineWidth(0) + paint.measureText(ellipsizeText)
+            newText.append(contentText.subSequence(0, start))
+                .append(lineTextSpannable.subSequence(0, endIndex))
+                .append(ellipsizeText)
+        } else {
+            lineTextWidth = lineWidth + paint.measureText(ellipsizeText)
+            newText.append(contentText.subSequence(0, start))
+                .append(lineTextSpannable)
+                .append(ellipsizeText)
+        }
 
-		val start = staticLayout.getLineStart(lineCount - 1)
-		val end = staticLayout.getLineEnd(lineCount - 1)
-		val lineTextSpannable = contentText
-			.subSequence(start, end)
-			.removeSuffix("\r\n")
-			.removeSuffix("\n")
+        val newStaticLayout = getStaticLayout(newText)
 
-		val newText = SpannableStringBuilder()
+        val iconLeft: Float
+        val iconTop: Float = (newStaticLayout.height - lineHeight).toFloat()
+        val iconRight: Float
+        val iconBottom: Float = newStaticLayout.height.toFloat()
+        if (gravity == Gravity.TOP or Gravity.CENTER_HORIZONTAL) {
+            val spaceLeft = (measuredWidth - lineTextWidth - paddingLeft - paddingRight) / 2
+            iconLeft = spaceLeft + lineTextWidth
+            iconRight =
+                spaceLeft + lineTextWidth + (iconDrawable?.bounds?.width()
+                    ?: 0) + expandableType.iconPaddingLeft
+        } else {
+            iconLeft = lineTextWidth + paddingLeft
+            iconRight =
+                lineTextWidth + paddingLeft + (iconDrawable?.bounds?.width()
+                    ?: 0) + expandableType.iconPaddingLeft
+        }
+        iconRect.set(iconLeft, iconTop, iconRight, iconBottom)
 
-		val lineStaticLayout = getStaticLayout(lineTextSpannable)
-		val lineWidth = lineStaticLayout.getLineWidth(0)
-		val lineHeight = lineStaticLayout.height
-		val lineTextWidth: Float
-		if ((lineWidth + usedWidth) > measuredWidth) {
-			val endIndex = getEndTextIndex(lineText = lineTextSpannable, usedWidth = usedWidth)
-			lineTextWidth = getStaticLayout(lineTextSpannable.subSequence(0, endIndex)).getLineWidth(0) + paint.measureText(ellipsizeText)
-			newText.append(contentText.subSequence(0, start))
-				.append(lineTextSpannable.subSequence(0, endIndex))
-				.append(ellipsizeText)
-		} else {
-			lineTextWidth = lineWidth + paint.measureText(ellipsizeText)
-			newText.append(contentText.subSequence(0, start))
-				.append(lineTextSpannable)
-				.append(ellipsizeText)
-		}
+        expandableCallback?.onCollapse()
+        // 重新计算高度
+        setMeasuredDimension(measuredWidth, newStaticLayout.height)
+        return newText
+    }
 
-		val newStaticLayout = getStaticLayout(newText)
+    private fun onBuildFoldText(
+        staticLayout: StaticLayout,
+    ): CharSequence {
 
-		val iconLeft: Float
-		val iconTop: Float = (newStaticLayout.height - lineHeight).toFloat()
-		val iconRight: Float
-		val iconBottom: Float = newStaticLayout.height.toFloat()
-		if (gravity == Gravity.TOP or Gravity.CENTER_HORIZONTAL) {
-			val spaceLeft = (measuredWidth - lineTextWidth - paddingLeft - paddingRight) / 2
-			iconLeft = spaceLeft + lineTextWidth
-			iconRight = spaceLeft + lineTextWidth + (iconDrawable?.bounds?.width() ?: 0) + iconPaddingLeft
-		} else {
-			iconLeft = lineTextWidth + paddingLeft
-			iconRight = lineTextWidth + paddingLeft + (iconDrawable?.bounds?.width() ?: 0) + iconPaddingLeft
-		}
-		iconRect.set(iconLeft, iconTop, iconRight, iconBottom)
+        val usedWidth = getUsedWidth()
 
-		expandableCallback?.onCollapse()
-		// 重新计算高度
-		setMeasuredDimension(measuredWidth, newStaticLayout.height)
-		return newText
-	}
+        val lastLine = staticLayout.lineCount - 1
 
-	private fun onBuildFoldText(
-		staticLayout: StaticLayout,
-	): CharSequence {
-		iconDrawable = initDrawable(foldTextIcon)
+        val lastLineStart = staticLayout.getLineStart(lastLine)
+        val lastLineEnd = staticLayout.getLineEnd(lastLine)
 
-		val usedWidth = getUsedWidth()
+        val lastLineSpan = contentText.subSequence(lastLineStart, lastLineEnd)
+            .removeSuffix("\r\n")
+            .removeSuffix("\n")
 
-		val lastLine = staticLayout.lineCount - 1
+        val lastLineStaticLayout = getStaticLayout(lastLineSpan)
 
-		val lastLineStart = staticLayout.getLineStart(lastLine)
-		val lastLineEnd = staticLayout.getLineEnd(lastLine)
+        val lineTextWidth = lastLineStaticLayout.getLineWidth(0)
+        val lineTextHeight = lastLineStaticLayout.height
+        val textHeight: Int
+        if ((lineTextWidth + usedWidth) > measuredWidth) {
+            val iconTop = staticLayout.height.toFloat()
+            val iconBottom = (staticLayout.height + lineTextHeight).toFloat()
+            val iconLeft: Float
+            val iconRight: Float
+            // TODO:
+            if (gravity == Gravity.TOP or Gravity.CENTER_HORIZONTAL) {
+                val spaceWidth =
+                    (measuredWidth - paddingLeft - paddingRight - (iconDrawable?.bounds?.width()
+                        ?: 0) + expandableType.iconPaddingLeft.toFloat()) / 2
+                iconLeft = spaceWidth
+                iconRight =
+                    spaceWidth + (iconDrawable?.bounds?.width()
+                        ?: 0) + expandableType.iconPaddingLeft.toFloat()
+            } else {
+                iconLeft = paddingLeft.toFloat()
+                iconRight =
+                    paddingLeft + (iconDrawable?.bounds?.width()
+                        ?: 0) + expandableType.iconPaddingLeft.toFloat()
+            }
+            textHeight = staticLayout.height + lineTextHeight.coerceAtLeast(
+                iconDrawable?.bounds?.height() ?: 0
+            )
+            iconRect.set(iconLeft, iconTop, iconRight, iconBottom)
+        } else {
+            val iconTop = (staticLayout.height - lineTextHeight).toFloat()
+            val iconBottom = staticLayout.height.toFloat()
+            val iconLeft: Float
+            val iconRight: Float
+            // TODO:
+            if (gravity == Gravity.TOP or Gravity.CENTER_HORIZONTAL) {
+                val spaceLeft = (measuredWidth - lineTextWidth - paddingLeft - paddingRight) / 2
+                iconLeft = spaceLeft + lineTextWidth
+                iconRight = spaceLeft + lineTextWidth + (iconDrawable?.bounds?.width()
+                    ?: 0) + expandableType.iconPaddingLeft
+            } else {
+                iconLeft = lineTextWidth + paddingLeft
+                iconRight = lineTextWidth + paddingLeft + (iconDrawable?.bounds?.width()
+                    ?: 0) + expandableType.iconPaddingLeft
+            }
+            textHeight = staticLayout.height
+            iconRect.set(iconLeft, iconTop, iconRight, iconBottom)
+        }
+        expandableCallback?.onExpand()
+        setMeasuredDimension(measuredWidth, textHeight)
+        return contentText
+    }
 
-		val lastLineSpan = contentText.subSequence(lastLineStart, lastLineEnd)
-			.removeSuffix("\r\n")
-			.removeSuffix("\n")
+    private val iconPaint = Paint().apply {
+        style = Paint.Style.STROKE
+        strokeWidth = 1f.dp2px
+        color = ContextCompat.getColor(context, R.color.purple_700)
+    }
 
-		val lastLineStaticLayout = getStaticLayout(lastLineSpan)
+    override fun onDraw(canvas: Canvas) {
+        super.onDraw(canvas)
+        canvas.drawRect(iconRect, iconPaint)
+        canvas.save()
+        val iconTop = iconDrawable?.bounds?.height()?.let {
+            iconRect.height() - it
+        } ?: 0f
+        canvas.translate(iconRect.left + expandableType.iconPaddingLeft, iconRect.top + iconTop)
+        iconDrawable?.draw(canvas)
+        canvas.restore()
+    }
 
-		val lineTextWidth = lastLineStaticLayout.getLineWidth(0)
-		val lineTextHeight = lastLineStaticLayout.height
-		val textHeight: Int
-		if ((lineTextWidth + usedWidth) > measuredWidth) {
-			val iconTop = staticLayout.height.toFloat()
-			val iconBottom = (staticLayout.height + lineTextHeight).toFloat()
-			val iconLeft: Float
-			val iconRight: Float
-			// TODO:
-			if (gravity == Gravity.TOP or Gravity.CENTER_HORIZONTAL) {
-				val spaceWidth = (measuredWidth - paddingLeft - paddingRight - (iconDrawable?.bounds?.width() ?: 0) + iconPaddingLeft.toFloat()) / 2
-				iconLeft = spaceWidth
-				iconRight = spaceWidth + (iconDrawable?.bounds?.width() ?: 0) + iconPaddingLeft.toFloat()
-			} else {
-				iconLeft = paddingLeft.toFloat()
-				iconRight = paddingLeft + (iconDrawable?.bounds?.width() ?: 0) + iconPaddingLeft.toFloat()
-			}
-			textHeight = staticLayout.height + lineTextHeight.coerceAtLeast(iconDrawable?.bounds?.height() ?: 0)
-			iconRect.set(iconLeft, iconTop, iconRight, iconBottom)
-		} else {
-			val iconTop = (staticLayout.height - lineTextHeight).toFloat()
-			val iconBottom = staticLayout.height.toFloat()
-			val iconLeft: Float
-			val iconRight: Float
-			// TODO:
-			if (gravity == Gravity.TOP or Gravity.CENTER_HORIZONTAL) {
-				val spaceLeft = (measuredWidth - lineTextWidth - paddingLeft - paddingRight) / 2
-				iconLeft = spaceLeft + lineTextWidth
-				iconRight = spaceLeft + lineTextWidth + (iconDrawable?.bounds?.width() ?: 0) + iconPaddingLeft
-			} else {
-				iconLeft = lineTextWidth + paddingLeft
-				iconRight = lineTextWidth + paddingLeft + (iconDrawable?.bounds?.width() ?: 0) + iconPaddingLeft
-			}
-			textHeight = staticLayout.height
-			iconRect.set(iconLeft, iconTop, iconRight, iconBottom)
-		}
-		expandableCallback?.onExpand()
-		setMeasuredDimension(measuredWidth, textHeight)
-		return contentText
-	}
+    fun preventNextClick() {
+        preventClick = true
+    }
 
-	private fun measureText() {
-		context.scope.launch {
+    @SuppressLint("ClickableViewAccessibility")
+    override fun onTouchEvent(event: MotionEvent?): Boolean {
+        event?.let {
+            if (isClickIcon(it)) {
+                return true
+            }
+        }
 
-			val staticLayout = getStaticLayout(text = contentText)
-			val staticLineCount = staticLayout.lineCount
+        text?.let {
+            if (it is Spannable) {
+                movementMethod?.onTouchEvent(this, it, event)
+            }
+        }
+        this.ignoreSpannableClick = true
+        val ret = super.onTouchEvent(event)
+        this.ignoreSpannableClick = false
+        return ret
+    }
 
-			if (staticLineCount > maxLineCount) {
-				if (expandState) {
-					val result = onBuildFoldText(staticLayout = staticLayout)
-					setText(result, BufferType.SPANNABLE)
-				} else {
-					// 最终显示的文字
-					val result = onBuildExpendText(staticLayout = staticLayout)
-					setText(result, BufferType.SPANNABLE)
-				}
-			} else {
-				val result = SpannableString(contentText)
-				expandableCallback?.onLoss()
-				// 重新计算高度
-				setMeasuredDimension(measuredWidth, staticLayout.height)
-				setText(result, BufferType.SPANNABLE)
-			}
-		}
-	}
+    private var lastX: Float = -1f
+    private var lastY: Float = -1f
 
-	private val iconPaint = Paint().apply {
-		style = Paint.Style.STROKE
-		strokeWidth = 1f.dp2px
-		color = ContextCompat.getColor(context, R.color.purple_700)
-	}
+    private fun isClickIcon(event: MotionEvent): Boolean {
+        when (event.action) {
+            MotionEvent.ACTION_DOWN -> {
+                lastX = event.getX(0)
+                lastY = event.getY(0)
+            }
+            MotionEvent.ACTION_UP -> {
+                if (iconRect.contains(lastX, lastY) && iconRect.contains(
+                        event.getX(0),
+                        event.getY(0)
+                    )
+                ) {
+                    context.scope.launch {
+                        if (expandState) {
+                            expandableCallback?.onExpandClick()
+                        } else {
+                            expandableCallback?.onFoldClick()
+                        }
+                    }
+                    cancelLongPress()
+                    return true
+                }
+            }
+        }
+        return false
+    }
 
-	override fun onDraw(canvas: Canvas) {
-		super.onDraw(canvas)
-		canvas.drawRect(iconRect, iconPaint)
-		canvas.save()
-		val iconTop = iconDrawable?.intrinsicHeight?.let {
-			iconRect.height() - it
-		} ?: 0f
-		canvas.translate(iconRect.left + iconPaddingLeft, iconRect.top + iconTop)
-		iconDrawable?.draw(canvas)
-		canvas.restore()
-	}
+    override fun setOnClickListener(l: OnClickListener?) {
+        this.clickListener = l
+        super.setOnClickListener(this)
+    }
 
-	fun preventNextClick() {
-		preventClick = true
-	}
+    override fun onClick(v: View?) {
+        if (preventClick) {
+            preventClick = false
+            return
+        }
+        clickListener?.onClick(v)
+    }
 
-	@SuppressLint("ClickableViewAccessibility")
-	override fun onTouchEvent(event: MotionEvent?): Boolean {
-		event?.let {
-			if (isClickIcon(it)) {
-				return true
-			}
-		}
+    interface Callback {
+        fun onExpand() {}
+        fun onCollapse() {}
+        fun onLoss() {}
 
-		text?.let {
-			if (it is Spannable) {
-				movementMethod?.onTouchEvent(this, it, event)
-			}
-		}
-		this.ignoreSpannableClick = true
-		val ret = super.onTouchEvent(event)
-		this.ignoreSpannableClick = false
-		return ret
-	}
+        fun onExpandClick()
+        fun onFoldClick()
+    }
 
-	private var lastX: Float = -1f
-	private var lastY: Float = -1f
+    /**
+     * 展开状态 true：展开，false：收起
+     */
+    fun changeExpendState(expandState: Boolean) {
+        this.expandState = expandState
+        iconDrawable = initDrawable(expandState)
+        requestLayout()
+    }
 
-	private fun isClickIcon(event: MotionEvent): Boolean {
-		when (event.action) {
-			MotionEvent.ACTION_DOWN -> {
-				lastX = event.getX(0)
-				lastY = event.getY(0)
-			}
-			MotionEvent.ACTION_UP -> {
-				if (iconRect.contains(lastX, lastY) && iconRect.contains(
-						event.getX(0),
-						event.getY(0)
-					)
-				) {
-					context.scope.launch {
-						if (expandState) {
-							expandableCallback?.onExpandClick()
-						} else {
-							expandableCallback?.onFoldClick()
-						}
-					}
-					cancelLongPress()
-					return true
-				}
-			}
-		}
-		return false
-	}
+    private val textIconPaint: TextPaint by lazy {
+        TextPaint()
+    }
 
-	override fun setOnClickListener(l: OnClickListener?) {
-		this.clickListener = l
-		super.setOnClickListener(this)
-	}
+    private fun initDrawable(expandState: Boolean): Drawable? {
+        when (val type = expandableType) {
+            is ExpandableImageIcon -> {
+                val iconResource = if (expandState) type.foldIcon else type.expandIcon
+                val textHeight = paint.fontMetrics.descent - paint.fontMetrics.ascent
+                return ResourcesCompat.getDrawable(resources, iconResource, context.theme)?.apply {
+                    var iconWidth: Float = if (type.iconWidth <= 0) {
+                        intrinsicWidth.toFloat()
+                    } else {
+                        type.iconWidth.toFloat()
+                    }
+                    var iconHeight: Float = if (type.iconHeight <= 0) {
+                        intrinsicHeight.toFloat()
+                    } else {
+                        type.iconHeight.toFloat()
+                    }
+                    if (iconHeight > textHeight) {
+                        iconWidth *= (textHeight / iconHeight)
+                        iconHeight = textHeight
+                    }
+                    setBounds(
+                        0,
+                        0,
+                        iconWidth.toInt(),
+                        iconHeight.toInt()
+                    )
+                }
+            }
+            is ExpandableTextIcon -> {
+                val iconText = if (expandState) type.foldText else type.expandText
 
-	override fun onClick(v: View?) {
-		if (preventClick) {
-			preventClick = false
-			return
-		}
-		clickListener?.onClick(v)
-	}
+                textIconPaint.textSize = if (type.textSize <= 0) {
+                    textSize
+                } else {
+                    type.textSize.toFloat()
+                }
 
-	interface Callback {
-		fun onExpand() {}
-		fun onCollapse() {}
-		fun onLoss() {}
+                textIconPaint.color = if (expandState) {
+                    if (type.foldTextColor <= 0) {
+                        textColors.defaultColor
+                    } else {
+                        ResourcesCompat.getColor(resources, type.foldTextColor, context.theme)
+                    }
+                } else {
+                    if (type.expandTextColor <= 0) {
+                        textColors.defaultColor
+                    } else {
+                        ResourcesCompat.getColor(resources, type.expandTextColor, context.theme)
+                    }
+                }
 
-		fun onExpandClick()
-		fun onFoldClick()
-	}
+                val iconHeight =
+                    textIconPaint.fontMetrics.descent - textIconPaint.fontMetrics.ascent
+                val iconWidth = textIconPaint.measureText(iconText)
 
-	/**
-	 * 展开状态 true：展开，false：收起
-	 */
-	fun changeExpendState(expandState: Boolean) {
-		this.expandState = expandState
-		requestLayout()
-	}
+                val bitmap = Bitmap.createBitmap(
+                    iconWidth.toInt(),
+                    iconHeight.toInt(),
+                    Bitmap.Config.ARGB_8888
+                )
+                val canvas = Canvas(bitmap)
+                canvas.drawText(
+                    iconText,
+                    0f,
+                    iconHeight - textIconPaint.descent(),
+                    textIconPaint
+                )
+                canvas.save()
+                return bitmap.toDrawable(resources).apply {
+                    bounds.set(
+                        0,
+                        0,
+                        iconWidth.toInt(),
+                        iconHeight.toInt()
+                    )
+                }
+            }
+        }
+    }
 }
