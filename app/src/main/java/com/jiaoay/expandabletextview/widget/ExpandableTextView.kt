@@ -139,10 +139,9 @@ class ExpandableTextView @JvmOverloads constructor(
             val staticLayout = getStaticLayout(text = contentText)
             val result = if (staticLayout.lineCount > maxLineCount) {
                 if (expandState) {
-                    onBuildFoldText(staticLayout = staticLayout)
-                } else {
-                    // 最终显示的文字
                     onBuildExpendText(staticLayout = staticLayout)
+                } else {
+                    onBuildFoldText(staticLayout = staticLayout)
                 }
             } else {
                 expandableCallback?.onLoss()
@@ -189,7 +188,7 @@ class ExpandableTextView @JvmOverloads constructor(
         return usedWidth
     }
 
-    private suspend fun onBuildExpendText(
+    private suspend fun onBuildFoldText(
         staticLayout: StaticLayout
     ): ExpandableViewInfo {
         val lineCount = maxLineCount
@@ -253,7 +252,7 @@ class ExpandableTextView @JvmOverloads constructor(
         )
     }
 
-    private fun onBuildFoldText(
+    private fun onBuildExpendText(
         staticLayout: StaticLayout,
     ): ExpandableViewInfo {
 
@@ -396,7 +395,7 @@ class ExpandableTextView @JvmOverloads constructor(
 
     private fun RectF.xYInIconRect(x: Float, y: Float): Boolean {
         val isLegal = left < right && top < bottom
-         return isLegal&&
+        return isLegal &&
                 x >= (left - 10.dp2px) &&
                 x < (right + 10.dp2px) &&
                 y >= (top - 10.dp2px) &&
