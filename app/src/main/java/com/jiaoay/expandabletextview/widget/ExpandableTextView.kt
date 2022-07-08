@@ -335,7 +335,10 @@ class ExpandableTextView @JvmOverloads constructor(
         val iconTop = iconDrawable?.bounds?.height()?.let {
             iconRect.height() - it
         } ?: 0f
-        canvas.translate(iconRect.left + expandableType.iconPaddingLeft, iconRect.top + iconTop)
+        canvas.translate(
+            iconRect.left + expandableType.iconPaddingLeft,
+            iconRect.top + iconTop - expandableType.iconPaddingBottom
+        )
         iconDrawable?.draw(canvas)
         canvas.restore()
     }
@@ -394,12 +397,13 @@ class ExpandableTextView @JvmOverloads constructor(
     }
 
     private fun RectF.xYInIconRect(x: Float, y: Float): Boolean {
+        val iconBottom = expandableType.iconPaddingBottom
         val isLegal = left < right && top < bottom
         return isLegal &&
                 x >= (left - 10.dp2px) &&
                 x < (right + 10.dp2px) &&
-                y >= (top - 10.dp2px) &&
-                y < (bottom + 10.dp2px)
+                y >= (top - 10.dp2px - iconBottom) &&
+                y < (bottom + 10.dp2px - iconBottom)
     }
 
     override fun setOnClickListener(l: OnClickListener?) {
