@@ -7,6 +7,8 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:clipChildren="false"
+        android:clipToPadding="false"
         android:orientation="vertical">
 
         <com.jiaoay.expandabletextview.widget.ExpandableTextView2
@@ -53,7 +55,8 @@
             <com.jiaoay.expandabletextview.widget.ExpandableIcon
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                app:expandIcon="@drawable/ic_launcher_background" />
+                android:scaleType="centerCrop"
+                app:expandIcon="@mipmap/ic_launcher_round" />
         </com.jiaoay.expandabletextview.widget.ExpandableTextView2>
 
         <com.jiaoay.expandabletextview.widget.ExpandableTextView2

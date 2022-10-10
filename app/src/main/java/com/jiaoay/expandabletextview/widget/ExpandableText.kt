@@ -15,13 +15,13 @@ class ExpandableText @JvmOverloads constructor(
     private var expandText = "[展开]"
 
     // 展开按钮文字颜色
-    private var expandTextColor: Int = -1
+    private var expandTextColor: Int = 0
 
     // 收起按钮
     private var foldText = "[收起]"
 
     // 收起按钮文字颜色
-    private var foldTextColor: Int = -1
+    private var foldTextColor: Int = 0
 
     init {
         attrs?.let {
@@ -32,7 +32,7 @@ class ExpandableText @JvmOverloads constructor(
 
             expandTextColor = typedArray.getColor(
                 R.styleable.ExpandableText_expandTextColor,
-                -1
+                0
             )
 
             foldText = typedArray.getString(
@@ -41,7 +41,7 @@ class ExpandableText @JvmOverloads constructor(
 
             foldTextColor = typedArray.getColor(
                 R.styleable.ExpandableText_foldTextColor,
-                -1
+                0
             )
             typedArray.recycle()
         }
@@ -49,7 +49,7 @@ class ExpandableText @JvmOverloads constructor(
 
     override fun isExpanded() {
         text = expandText
-        if (expandTextColor > 0) {
+        if (expandTextColor != 0) {
             setTextColor(expandTextColor)
         } else {
             setTextColor(textColors)
@@ -58,7 +58,7 @@ class ExpandableText @JvmOverloads constructor(
 
     override fun isFolded() {
         text = foldText
-        if (foldTextColor > 0) {
+        if (foldTextColor != 0) {
             setTextColor(foldTextColor)
         } else {
             setTextColor(textColors)

@@ -63,6 +63,8 @@ class ExpandableTextView2 @JvmOverloads constructor(
     private val textHeight: Float
 
     init {
+        clipChildren = false
+        clipToPadding = false
         attrs?.let {
             val typedArray = context.obtainStyledAttributes(it, R.styleable.ExpandableTextView2)
             maxExpandLineNum = typedArray.getInt(

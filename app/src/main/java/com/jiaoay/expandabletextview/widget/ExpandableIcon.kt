@@ -41,6 +41,9 @@ class ExpandableIcon @JvmOverloads constructor(
     }
 
     override fun getButtonWidth(): Float {
+        if (layoutParams.width > 0) {
+            return layoutParams.width.toFloat()
+        }
         return ResourcesCompat.getDrawable(context.resources, expandIconResource, context.theme)?.intrinsicWidth?.toFloat() ?: 0f
     }
 
