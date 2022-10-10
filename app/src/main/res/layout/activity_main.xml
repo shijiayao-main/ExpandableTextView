@@ -1,8 +1,80 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <com.jiaoay.expandabletextview.widget.ExpandableTextView2
+            android:id="@+id/text1"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:lineSpacingMultiplier="2"
+            app:maxExpandLine="5"
+            app:textColor="@color/purple_700"
+            app:textSize="24dp" />
+
+        <com.jiaoay.expandabletextview.widget.ExpandableTextView2
+            android:id="@+id/text2"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp">
+
+            <com.jiaoay.expandabletextview.widget.ExpandableText
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                app:expandText="[我喊你一声你敢点我吗]"
+                app:expandTextColor="@color/teal_200"
+                app:foldText="[行了，别看了，收起来吧]"
+                app:foldTextColor="@color/purple_200" />
+        </com.jiaoay.expandabletextview.widget.ExpandableTextView2>
+
+        <com.jiaoay.expandabletextview.widget.ExpandableTextView2
+            android:id="@+id/text3"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp">
+
+            <com.jiaoay.expandabletextview.widget.ExpandableIcon
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+        </com.jiaoay.expandabletextview.widget.ExpandableTextView2>
+
+        <com.jiaoay.expandabletextview.widget.ExpandableTextView2
+            android:id="@+id/text4"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp">
+
+            <com.jiaoay.expandabletextview.widget.ExpandableIcon
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                app:expandIcon="@drawable/ic_launcher_background" />
+        </com.jiaoay.expandabletextview.widget.ExpandableTextView2>
+
+        <com.jiaoay.expandabletextview.widget.ExpandableTextView2
+            android:id="@+id/text5"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp">
+
+            <com.jiaoay.expandabletextview.widget.ExpandableIcon
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                app:expandIcon="@drawable/ic_launcher_background" />
+        </com.jiaoay.expandabletextview.widget.ExpandableTextView2>
+
+        <com.jiaoay.expandabletextview.widget.ExpandableTextView2
+            android:id="@+id/text6"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            app:maxExpandLine="10" />
+
+    </LinearLayout>
 
 </ScrollView>

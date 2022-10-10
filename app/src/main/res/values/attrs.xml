@@ -1,6 +1,29 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <declare-styleable name="ExpandableTextView">
-        <attr name="max_expand_line" format="integer" />
+    <attr name="maxExpandLine" format="integer" />
+    <attr name="drawBorder" format="boolean" />
+    <attr name="textColor" format="color" />
+    <attr name="textSize" format="dimension" />
+
+    <declare-styleable name="ExpandableTextView2">
+        <attr name="maxExpandLine" />
+        <attr name="expandedIconMarginLeft" format="dimension" />
+        <attr name="lineSpacingExtra" format="dimension" />
+        <attr name="lineSpacingMultiplier" format="float" />
+        <attr name="defaultExpanded" format="boolean" />
+        <attr name="textColor" />
+        <attr name="textSize" />
+    </declare-styleable>
+
+    <declare-styleable name="ExpandableIcon">
+        <attr name="expandIcon" format="reference" />
+        <attr name="foldIcon" format="reference" />
+    </declare-styleable>
+
+    <declare-styleable name="ExpandableText">
+        <attr name="expandText" format="string" />
+        <attr name="expandTextColor" format="color" />
+        <attr name="foldText" format="string" />
+        <attr name="foldTextColor" format="color" />
     </declare-styleable>
 </resources>
