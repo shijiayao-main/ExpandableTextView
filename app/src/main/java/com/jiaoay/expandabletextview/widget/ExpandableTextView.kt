@@ -311,7 +311,7 @@ class ExpandableTextView @JvmOverloads constructor(
     fun setText(
         text: CharSequence,
         isExpanded: Boolean = false,
-        expandedListener: ((Boolean)-> Unit)? = null
+        expandedListener: ((Boolean) -> Unit)? = null
     ) {
         if (text.isEmpty()) {
             expandedText = null
@@ -393,9 +393,9 @@ class ExpandableTextView @JvmOverloads constructor(
                     textView.setText(text, TextView.BufferType.SPANNABLE)
                 }
                 requestLayout()
-                this@ExpandableTextView.expandedListener = expandedListener
             }
         }
+        this@ExpandableTextView.expandedListener = expandedListener
     }
 
     private suspend fun getEndTextIndex(lineText: CharSequence, usedWidth: Float): Int {
