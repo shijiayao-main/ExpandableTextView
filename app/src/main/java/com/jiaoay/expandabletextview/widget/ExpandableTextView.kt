@@ -24,7 +24,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-class ExpandableTextView2 @JvmOverloads constructor(
+class ExpandableTextView @JvmOverloads constructor(
     context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
 ) : ViewGroup(context, attrs, defStyleAttr), OnClickListener {
 
@@ -38,7 +38,7 @@ class ExpandableTextView2 @JvmOverloads constructor(
                 }
             }
             .build()
-        setOnClickListener(this@ExpandableTextView2)
+        setOnClickListener(this@ExpandableTextView)
     }
 
     // 最大显示的行数，超过的将被折叠
@@ -47,8 +47,14 @@ class ExpandableTextView2 @JvmOverloads constructor(
     // 按钮距离左侧文字距离
     private var expandableIconMarginLeft = 8f.dp2px
 
+    private var expandedListener: ((Boolean) -> Unit)? = null
+
     // 当前是否已经被展开
     private var isExpanded: Boolean = false
+        set(value) {
+            expandedListener?.invoke(value)
+            field = value
+        }
 
     // 是否超过了最大行数
     private var isExceed: Boolean = false
@@ -302,7 +308,11 @@ class ExpandableTextView2 @JvmOverloads constructor(
     private var foldedLastLineWidth = 0f
     private val ellipsizeText = "…"
 
-    fun setText(text: CharSequence, isExpanded: Boolean = false) {
+    fun setText(
+        text: CharSequence,
+        isExpanded: Boolean = false,
+        expandedListener: ((Boolean)-> Unit)? = null
+    ) {
         if (text.isEmpty()) {
             expandedText = null
             foldedText = null
@@ -311,11 +321,12 @@ class ExpandableTextView2 @JvmOverloads constructor(
             this.isExpanded = false
             textView.text = ""
             requestLayout()
+            this.expandedListener = null
             return
         }
         post {
             context.scopeOrNull?.launch {
-                this@ExpandableTextView2.isExpanded = isExpanded
+                this@ExpandableTextView.isExpanded = isExpanded
 
                 val staticLayout = getStaticLayout(text = text)
                 if (staticLayout.lineCount > maxExpandLineNum) {
@@ -382,6 +393,7 @@ class ExpandableTextView2 @JvmOverloads constructor(
                     textView.setText(text, TextView.BufferType.SPANNABLE)
                 }
                 requestLayout()
+                this@ExpandableTextView.expandedListener = expandedListener
             }
         }
     }

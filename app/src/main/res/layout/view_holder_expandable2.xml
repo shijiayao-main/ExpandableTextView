@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="2dp"
+        android:background="#000b00" />
+
+    <com.jiaoay.expandabletextview.widget.ExpandableTextView
+        android:id="@+id/text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp">
+
+        <com.jiaoay.expandabletextview.widget.ExpandableText
+            android:id="@+id/expandableText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            app:expandTextColor="@color/teal_200"
+            app:foldTextColor="@color/purple_200" />
+    </com.jiaoay.expandabletextview.widget.ExpandableTextView>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="2dp"
+        android:background="#000b00" />
+</LinearLayout>

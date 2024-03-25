@@ -80,4 +80,17 @@ class ExpandableText @JvmOverloads constructor(
     override fun setVisible(isVisible: Boolean) {
         this.isVisible = isVisible
     }
+
+    fun setExpandableText(
+        expandText: String,
+        foldText: String
+    ) {
+        if (expandText == this.expandText && foldText == this.foldText) {
+            return
+        }
+        this.expandText = expandText
+        this.foldText = foldText
+
+        requestLayout()
+    }
 }

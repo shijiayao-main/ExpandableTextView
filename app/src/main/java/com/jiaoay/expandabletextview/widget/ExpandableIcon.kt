@@ -3,6 +3,7 @@ package com.jiaoay.expandabletextview.widget
 import android.content.Context
 import android.util.AttributeSet
 import android.view.View
+import androidx.annotation.DrawableRes
 import androidx.appcompat.widget.AppCompatImageView
 import androidx.core.content.res.ResourcesCompat
 import androidx.core.view.isVisible
@@ -59,4 +60,16 @@ class ExpandableIcon @JvmOverloads constructor(
         this.isVisible = isVisible
     }
 
+    fun setExpandableIcon(
+        @DrawableRes expandIconResource: Int,
+        @DrawableRes foldIconResource: Int
+    ) {
+        if (expandIconResource == this.expandIconResource && foldIconResource == this.foldIconResource) {
+            return
+        }
+        this.expandIconResource = expandIconResource
+        this.foldIconResource = foldIconResource
+
+        requestLayout()
+    }
 }
