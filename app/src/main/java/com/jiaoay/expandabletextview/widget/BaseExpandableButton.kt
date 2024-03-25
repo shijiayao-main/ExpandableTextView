@@ -5,6 +5,7 @@ import android.view.View
 interface BaseExpandableButton {
     // 被展开
     fun isExpanded()
+
     // 被折叠
     fun isFolded()
 
