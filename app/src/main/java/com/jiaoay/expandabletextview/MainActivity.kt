@@ -27,12 +27,24 @@ class MainActivity : AppCompatActivity() {
         binding.recyclerView.adapter = adapter
 
         val list = listOf(
+            ExpandableTextDataInfo(
+                text = getString(R.string.test2),
+                expandIconResource = R.drawable.ic_launcher_background,
+                foldIconResource = R.drawable.ic_launcher_background,
+            ),
             DefaultDataInfo,
             ExpandableTextDataInfo(
                 text = getString(R.string.test1),
-                expandIconResource = R.drawable.ic_launcher_background
+                expandIconResource = R.drawable.ic_launcher_background,
+                foldIconResource = R.drawable.ic_launcher_background,
             ),
             DefaultDataInfo,
+            DefaultDataInfo,
+            ExpandableTextDataInfo2(
+                text = getString(R.string.test1),
+                expandText = "[我喊你一声你敢点我吗]",
+                foldText = "[?真点啊!]"
+            ),
             DefaultDataInfo,
             DefaultDataInfo,
             ExpandableTextDataInfo2(

@@ -18,7 +18,8 @@
         <com.jiaoay.expandabletextview.widget.ExpandableIcon
             android:id="@+id/expandableIcon"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content" />
+            android:layout_height="24dp"
+            android:scaleType="centerInside" />
     </com.jiaoay.expandabletextview.widget.ExpandableTextView>
 
     <View
