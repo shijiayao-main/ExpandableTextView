@@ -81,6 +81,14 @@ class ExpandableText @JvmOverloads constructor(
         this.isVisible = isVisible
     }
 
+    override fun getButtonMeasuredWidth(): Int {
+        return measuredWidth
+    }
+
+    override fun getButtonMeasuredHeight(): Int {
+        return measuredHeight
+    }
+
     fun setExpandableText(
         expandText: String,
         foldText: String

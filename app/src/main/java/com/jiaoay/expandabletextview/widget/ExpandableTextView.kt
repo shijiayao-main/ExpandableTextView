@@ -72,33 +72,33 @@ class ExpandableTextView @JvmOverloads constructor(
         clipChildren = false
         clipToPadding = false
         attrs?.let {
-            val typedArray = context.obtainStyledAttributes(it, R.styleable.ExpandableTextView2)
+            val typedArray = context.obtainStyledAttributes(it, R.styleable.ExpandableTextView)
             maxExpandLineNum = typedArray.getInt(
-                R.styleable.ExpandableTextView2_maxExpandLine,
+                R.styleable.ExpandableTextView_maxExpandLine,
                 3
             )
             isExpanded = typedArray.getBoolean(
-                R.styleable.ExpandableTextView2_defaultExpanded,
+                R.styleable.ExpandableTextView_defaultExpanded,
                 false
             )
             val textColor = typedArray.getColor(
-                R.styleable.ExpandableTextView2_textColor,
+                R.styleable.ExpandableTextView_textColor,
                 Color.BLACK
             )
             val textSize = typedArray.getDimension(
-                R.styleable.ExpandableTextView2_textSize,
+                R.styleable.ExpandableTextView_textSize,
                 12f.dp2px
             )
             typedArray.getDimension(
-                R.styleable.ExpandableTextView2_expandedIconMarginLeft,
+                R.styleable.ExpandableTextView_expandedIconMarginLeft,
                 8f.dp2px
             )
             val lineSpacingExtra = typedArray.getDimension(
-                R.styleable.ExpandableTextView2_lineSpacingExtra,
+                R.styleable.ExpandableTextView_lineSpacingExtra,
                 0f
             )
             val lineSpacingMultiplier = typedArray.getFloat(
-                R.styleable.ExpandableTextView2_lineSpacingMultiplier,
+                R.styleable.ExpandableTextView_lineSpacingMultiplier,
                 1f
             )
             typedArray.recycle()
@@ -180,13 +180,13 @@ class ExpandableTextView @JvmOverloads constructor(
                 0
             )
 
-            if (width + paddingRight - expandedLastLineWidth > expandableButton.getMeasuredWidth() + expandableIconMarginLeft) {
+            if (width + paddingRight - expandedLastLineWidth > expandableButton.getButtonMeasuredWidth() + expandableIconMarginLeft) {
                 // 最后一行能够放下收起按钮
                 setMeasuredDimension(width, textView.measuredHeight)
             } else {
                 setMeasuredDimension(
                     width,
-                    textView.measuredHeight + textHeight.coerceAtLeast(expandableButton.getMeasuredHeight().toFloat()).toInt()
+                    textView.measuredHeight + textHeight.coerceAtLeast(expandableButton.getButtonMeasuredHeight().toFloat()).toInt()
                 )
             }
         } else {
@@ -224,25 +224,25 @@ class ExpandableTextView @JvmOverloads constructor(
         val imageBottom: Int
         if (isExpanded) {
             // 应展示为展开状态
-            val imageSpace = (textHeight - expandableButton.getMeasuredHeight()) / 2f
-            if (width + paddingRight - expandedLastLineWidth > expandableButton.getMeasuredWidth() + expandableIconMarginLeft) {
+            val imageSpace = (textHeight - expandableButton.getButtonMeasuredHeight()) / 2f
+            if (width + paddingRight - expandedLastLineWidth > expandableButton.getButtonMeasuredWidth() + expandableIconMarginLeft) {
                 // 最后一行能够放下收起按钮
                 imageLeft = (expandedLastLineWidth + paddingLeft + expandableIconMarginLeft).toInt()
                 imageTop = (paddingTop + textView.measuredHeight - textHeight + imageSpace).toInt()
-                imageRight = (expandedLastLineWidth + paddingLeft + expandableIconMarginLeft + expandableButton.getMeasuredWidth()).toInt()
+                imageRight = (expandedLastLineWidth + paddingLeft + expandableIconMarginLeft + expandableButton.getButtonMeasuredWidth()).toInt()
                 imageBottom = (paddingTop + textView.measuredHeight - imageSpace).toInt()
             } else {
                 imageLeft = paddingLeft
                 imageTop = (paddingTop + textView.measuredHeight + imageSpace).toInt()
-                imageRight = paddingLeft + expandableButton.getMeasuredWidth()
+                imageRight = paddingLeft + expandableButton.getButtonMeasuredWidth()
                 imageBottom = (paddingTop + textView.measuredHeight + textHeight - imageSpace).toInt()
             }
         } else {
             // 应展示为收起状态
-            val imageSpace = (textHeight - expandableButton.getMeasuredHeight()) / 2f
+            val imageSpace = (textHeight - expandableButton.getButtonMeasuredHeight()) / 2f
             imageLeft = (foldedLastLineWidth + paddingLeft + expandableIconMarginLeft).toInt()
             imageTop = (paddingTop + textView.measuredHeight - textHeight + imageSpace).toInt()
-            imageRight = (foldedLastLineWidth + paddingLeft + expandableIconMarginLeft + expandableButton.getMeasuredWidth()).toInt()
+            imageRight = (foldedLastLineWidth + paddingLeft + expandableIconMarginLeft + expandableButton.getButtonMeasuredWidth()).toInt()
             imageBottom = (paddingTop + textView.measuredHeight - imageSpace).toInt()
         }
         imageRect.set(imageLeft, imageTop, imageRight, imageBottom)

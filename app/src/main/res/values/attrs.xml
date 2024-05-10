@@ -5,7 +5,7 @@
     <attr name="textColor" format="color" />
     <attr name="textSize" format="dimension" />
 
-    <declare-styleable name="ExpandableTextView2">
+    <declare-styleable name="ExpandableTextView">
         <attr name="maxExpandLine" />
         <attr name="expandedIconMarginLeft" format="dimension" />
         <attr name="lineSpacingExtra" format="dimension" />

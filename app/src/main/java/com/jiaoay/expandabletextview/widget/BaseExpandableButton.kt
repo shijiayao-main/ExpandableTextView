@@ -18,6 +18,6 @@ interface BaseExpandableButton {
 
     fun setVisible(isVisible: Boolean)
 
-    fun getMeasuredWidth(): Int
-    fun getMeasuredHeight(): Int
+    fun getButtonMeasuredWidth(): Int
+    fun getButtonMeasuredHeight(): Int
 }

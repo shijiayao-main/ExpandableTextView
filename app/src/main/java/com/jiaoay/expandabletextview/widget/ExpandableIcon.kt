@@ -45,7 +45,30 @@ class ExpandableIcon @JvmOverloads constructor(
         if (layoutParams.width > 0) {
             return layoutParams.width.toFloat()
         }
-        return ResourcesCompat.getDrawable(context.resources, expandIconResource, context.theme)?.intrinsicWidth?.toFloat() ?: 0f
+        val buttonDrawable = ResourcesCompat.getDrawable(context.resources, expandIconResource, context.theme) ?: return 0f
+        val imageWidth = buttonDrawable.intrinsicWidth.toFloat()
+        val imageHeight = buttonDrawable.intrinsicHeight.toFloat()
+
+        val paramsHeight = layoutParams.height
+
+        return when (scaleType) {
+            ScaleType.MATRIX -> imageWidth
+            ScaleType.FIT_XY -> imageWidth
+            ScaleType.FIT_START -> imageWidth
+            ScaleType.FIT_CENTER -> imageWidth
+            ScaleType.FIT_END -> imageWidth
+            ScaleType.CENTER -> imageWidth
+            ScaleType.CENTER_CROP -> imageWidth
+            ScaleType.CENTER_INSIDE -> {
+                if (paramsHeight > 0) {
+                    (imageWidth / imageHeight) * paramsHeight
+                } else {
+                    imageWidth
+                }
+            }
+
+            else -> imageWidth
+        }
     }
 
     override fun getView(): View {
@@ -58,6 +81,14 @@ class ExpandableIcon @JvmOverloads constructor(
 
     override fun setVisible(isVisible: Boolean) {
         this.isVisible = isVisible
+    }
+
+    override fun getButtonMeasuredWidth(): Int {
+        return getButtonWidth().toInt()
+    }
+
+    override fun getButtonMeasuredHeight(): Int {
+        return measuredHeight
     }
 
     fun setExpandableIcon(
