@@ -33,11 +33,11 @@ class ExpandableIcon @JvmOverloads constructor(
         }
     }
 
-    override fun isExpanded() {
+    override fun toExpanded() {
         setImageResource(expandIconResource)
     }
 
-    override fun isFolded() {
+    override fun toFolded() {
         setImageResource(foldIconResource)
     }
 

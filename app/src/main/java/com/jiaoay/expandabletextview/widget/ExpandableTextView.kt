@@ -21,12 +21,17 @@ import com.jiaoay.expandabletextview.R
 import com.jiaoay.expandabletextview.dp2px
 import com.jiaoay.expandabletextview.scopeOrNull
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class ExpandableTextView @JvmOverloads constructor(
     context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
 ) : ViewGroup(context, attrs, defStyleAttr), OnClickListener {
+
+    companion object {
+        private const val TAG = "ExpandableTextView"
+    }
 
     private val textView: AppCompatTextView = AppCompatTextView(context).apply {
         movementMethod = LinkMovementMethod.getInstance()
@@ -280,10 +285,10 @@ class ExpandableTextView @JvmOverloads constructor(
                     if (isExceed) {
                         if (isExpanded) {
                             isExpanded = false
-                            expandableButton.isExpanded()
+                            expandableButton.toExpanded()
                         } else {
                             isExpanded = true
-                            expandableButton.isFolded()
+                            expandableButton.toFolded()
                         }
                         requestLayout()
                     }
@@ -298,10 +303,10 @@ class ExpandableTextView @JvmOverloads constructor(
     private fun Rect.xYInIconRect(x: Float, y: Float): Boolean {
         val isLegal = left < right && top < bottom
         return isLegal &&
-                x >= (left - 10.dp2px) &&
-                x < (right + 10.dp2px) &&
-                y >= (top - 10.dp2px) &&
-                y < (bottom + 10.dp2px)
+            x >= (left - 10.dp2px) &&
+            x < (right + 10.dp2px) &&
+            y >= (top - 10.dp2px) &&
+            y < (bottom + 10.dp2px)
     }
 
     private var expandedLastLineWidth = 0f
@@ -326,76 +331,94 @@ class ExpandableTextView @JvmOverloads constructor(
         }
         post {
             context.scopeOrNull?.launch {
-                this@ExpandableTextView.isExpanded = isExpanded
+                val job = launch(Dispatchers.Default) {
+                    this@ExpandableTextView.isExpanded = isExpanded
 
-                val staticLayout = getStaticLayout(text = text)
-                if (staticLayout.lineCount > maxExpandLineNum) {
-                    if (isExpanded.not()) {
-                        expandableButton.isExpanded()
+                    val staticLayout = getStaticLayout(text = text)
+                    if (staticLayout.lineCount > maxExpandLineNum) {
+                        withContext(Dispatchers.Main) {
+                            if (isExpanded.not()) {
+                                expandableButton.toExpanded()
+                            } else {
+                                expandableButton.toFolded()
+                            }
+                        }
+
+                        isExceed = true
+                        expandableButton.setVisible(true)
+                        expandedText = text
+
+                        // 判断协程是否需要终止
+                        ensureActive()
+
+                        calculateText(
+                            staticLayout = staticLayout,
+                            text = text
+                        )
                     } else {
-                        expandableButton.isFolded()
+                        expandedText = text
+                        foldedText = text
+                        isExceed = false
+                        expandableButton.setVisible(false)
                     }
-
-                    isExceed = true
-                    expandableButton.setVisible(true)
-                    expandedText = text
-                    textView.setText(text, TextView.BufferType.SPANNABLE)
-
-                    // 获取展开状态下最后一行文字的高度以便确定收起按钮应在的位置
-                    val lastLine = staticLayout.lineCount - 1
-                    val lastLineStart = staticLayout.getLineStart(lastLine).coerceAtMost(text.length)
-                    val lastLineEnd = staticLayout.getLineEnd(lastLine).coerceAtMost(text.length)
-                    val lastLineSpan = text.subSequence(lastLineStart, lastLineEnd)
-                        .removeSuffix("\r\n")
-                        .removeSuffix("\n")
-                    val lastLineStaticLayout = getStaticLayout(lastLineSpan)
-                    expandedLastLineWidth = lastLineStaticLayout.getLineWidth(0)
-
-                    // 获取折叠状态下最后一行文字的高度以便确定展开按钮应在的位置
-                    val start = staticLayout.getLineStart(maxExpandLineNum - 1).coerceAtMost(text.length)
-                    val end = staticLayout.getLineEnd(maxExpandLineNum - 1).coerceAtMost(text.length)
-                    val lineTextSpannable = text
-                        .subSequence(start, end)
-                        .removeSuffix("\r\n")
-                        .removeSuffix("\n")
-
-                    val lineStaticLayout = getStaticLayout(lineTextSpannable)
-                    val lineWidth = lineStaticLayout.getLineWidth(0)
-                    val ellipsizeTextWidth = textView.paint.measureText(ellipsizeText)
-                    // 获取展开按钮的宽度
-                    val expandableButtonWidth = expandableButton.getButtonWidth() + ellipsizeTextWidth
-                    val currentWidth = lineWidth + paddingLeft + expandableButtonWidth + expandableIconMarginLeft
-
-                    val newText = SpannableStringBuilder()
-                    if (currentWidth > measuredWidth) {
-                        val endIndex = getEndTextIndex(lineText = lineTextSpannable, usedWidth = expandableIconMarginLeft + expandableButtonWidth)
-                        foldedLastLineWidth = getStaticLayout(
-                            lineTextSpannable.subSequence(
-                                0,
-                                endIndex.coerceAtMost(lineTextSpannable.length)
-                            )
-                        ).getLineWidth(0) + ellipsizeTextWidth
-                        newText.append(text.subSequence(0, start.coerceAtMost(text.length)))
-                            .append(lineTextSpannable.subSequence(0, endIndex.coerceAtMost(lineTextSpannable.length)))
-                            .append(ellipsizeText)
-                    } else {
-                        foldedLastLineWidth = lineWidth + ellipsizeTextWidth
-                        newText.append(text.subSequence(0, start.coerceAtMost(text.length)))
-                            .append(lineTextSpannable)
-                            .append(ellipsizeText)
-                    }
-                    foldedText = newText
-                } else {
-                    expandedText = text
-                    foldedText = text
-                    isExceed = false
-                    expandableButton.setVisible(false)
-                    textView.setText(text, TextView.BufferType.SPANNABLE)
                 }
+
+                job.join()
+                textView.setText(text, TextView.BufferType.SPANNABLE)
                 requestLayout()
             }
         }
         this@ExpandableTextView.expandedListener = expandedListener
+    }
+
+    private suspend fun calculateText(
+        staticLayout: StaticLayout,
+        text: CharSequence
+    ) = withContext(Dispatchers.Default) {
+        // 获取展开状态下最后一行文字的高度以便确定收起按钮应在的位置
+        val lastLine = staticLayout.lineCount - 1
+        val lastLineStart = staticLayout.getLineStart(lastLine).coerceAtMost(text.length)
+        val lastLineEnd = staticLayout.getLineEnd(lastLine).coerceAtMost(text.length)
+        val lastLineSpan = text.subSequence(lastLineStart, lastLineEnd)
+            .removeSuffix("\r\n")
+            .removeSuffix("\n")
+        val lastLineStaticLayout = getStaticLayout(lastLineSpan)
+        expandedLastLineWidth = lastLineStaticLayout.getLineWidth(0)
+
+        // 获取折叠状态下最后一行文字的高度以便确定展开按钮应在的位置
+        val start = staticLayout.getLineStart(maxExpandLineNum - 1).coerceAtMost(text.length)
+        val end = staticLayout.getLineEnd(maxExpandLineNum - 1).coerceAtMost(text.length)
+        val lineTextSpannable = text
+            .subSequence(start, end)
+            .removeSuffix("\r\n")
+            .removeSuffix("\n")
+
+        val lineStaticLayout = getStaticLayout(lineTextSpannable)
+        val lineWidth = lineStaticLayout.getLineWidth(0)
+        val ellipsizeTextWidth = textView.paint.measureText(ellipsizeText)
+        // 获取展开按钮的宽度
+        val expandableButtonWidth = expandableButton.getButtonWidth() + ellipsizeTextWidth
+        val currentWidth = lineWidth + paddingLeft + expandableButtonWidth + expandableIconMarginLeft
+
+        val newText = SpannableStringBuilder()
+        if (currentWidth > measuredWidth) {
+            val endIndex = getEndTextIndex(lineText = lineTextSpannable, usedWidth = expandableIconMarginLeft + expandableButtonWidth)
+            foldedLastLineWidth = getStaticLayout(
+                lineTextSpannable.subSequence(
+                    0,
+                    endIndex.coerceAtMost(lineTextSpannable.length)
+                )
+            ).getLineWidth(0) + ellipsizeTextWidth
+            newText.append(text.subSequence(0, start.coerceAtMost(text.length)))
+                .append(lineTextSpannable.subSequence(0, endIndex.coerceAtMost(lineTextSpannable.length)))
+                .append(ellipsizeText)
+        } else {
+            foldedLastLineWidth = lineWidth + ellipsizeTextWidth
+            newText.append(text.subSequence(0, start.coerceAtMost(text.length)))
+                .append(lineTextSpannable)
+                .append(ellipsizeText)
+        }
+        foldedText = newText
     }
 
     private suspend fun getEndTextIndex(lineText: CharSequence, usedWidth: Float): Int {

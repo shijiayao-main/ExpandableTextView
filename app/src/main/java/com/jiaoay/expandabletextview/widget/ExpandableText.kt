@@ -47,7 +47,7 @@ class ExpandableText @JvmOverloads constructor(
         }
     }
 
-    override fun isExpanded() {
+    override fun toExpanded() {
         text = expandText
         if (expandTextColor != 0) {
             setTextColor(expandTextColor)
@@ -56,7 +56,7 @@ class ExpandableText @JvmOverloads constructor(
         }
     }
 
-    override fun isFolded() {
+    override fun toFolded() {
         text = foldText
         if (foldTextColor != 0) {
             setTextColor(foldTextColor)

@@ -4,10 +4,10 @@ import android.view.View
 
 interface BaseExpandableButton {
     // 被展开
-    fun isExpanded()
+    fun toExpanded()
 
     // 被折叠
-    fun isFolded()
+    fun toFolded()
 
     // 获取展开按钮的宽度(由于可能还未measure, 需要手动测量)
     fun getButtonWidth(): Float
