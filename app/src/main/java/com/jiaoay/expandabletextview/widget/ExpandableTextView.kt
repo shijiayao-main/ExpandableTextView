@@ -34,7 +34,6 @@ class ExpandableTextView @JvmOverloads constructor(
 
     companion object {
         private const val TAG = "ExpandableTextView"
-        private const val maxCalculateNum = 8
     }
 
     private val textView: AppCompatTextView = AppCompatTextView(context).apply {
@@ -443,43 +442,47 @@ class ExpandableTextView @JvmOverloads constructor(
                 val lineWidth = getStaticLayout(lineText).getLineWidth(0)
                 val averageTextWidth: Float = lineWidth / lineTextLength
                 val lastIndex: Int = if (averageTextWidth > 0) {
-                    val index = ((usedWidth / averageTextWidth).roundToInt()).coerceAtLeast(1)
+                    val index = ((usedWidth / averageTextWidth).roundToInt()).coerceAtLeast(3)
                     lineTextLength - index
                 } else {
                     lineTextLength - 1
                 }
 
+                val calculateNum: Int = if (averageTextWidth > 10) {
+                    4
+                } else {
+                    if (lineTextLength < 50) {
+                        4
+                    } else {
+                        8
+                    }
+                }
+
                 if (lastIndex < lineTextLength) {
                     val str = lineText.subSequence(lastIndex, lineTextLength)
                     val strWidth = getStaticLayout(str).getLineWidth(0)
-                    return@withContext if (strWidth == usedWidth) {
-                        lastIndex
+                    if (strWidth == usedWidth) {
+                        return@withContext lastIndex
                     } else if (strWidth > usedWidth) {
-                        calculateWhenMore(
+                        return@withContext calculateWhenMore(
                             lineText = lineText,
                             lineTextLength = lineTextLength,
                             lastIndex = lastIndex,
-                            usedWidth = usedWidth
-                        )
-                    } else {
-                        calculateWhenLess(
-                            lineText = lineText,
-                            lineTextLength = lineTextLength,
-                            lastIndex = lastIndex,
-                            usedWidth = usedWidth
+                            usedWidth = usedWidth,
+                            calculateNum = calculateNum
                         )
                     }
-                } else {
-                    return@withContext calculateWhenLess(
-                        lineText = lineText,
-                        lineTextLength = lineTextLength,
-                        lastIndex = lastIndex,
-                        usedWidth = usedWidth
-                    )
                 }
+                return@withContext calculateWhenLess(
+                    lineText = lineText,
+                    lineTextLength = lineTextLength,
+                    lastIndex = lastIndex,
+                    usedWidth = usedWidth,
+                    calculateNum = calculateNum
+                )
             }
         }
-        Log.d(TAG, "getEndTextIndex: duration: $functionDuration, result: $result")
+        Log.d(TAG, "getEndTextIndex: text: ${lineText.substring(0, lineText.length.coerceAtMost(10))}, duration: $functionDuration, result: $result")
         return result
     }
 
@@ -487,14 +490,14 @@ class ExpandableTextView @JvmOverloads constructor(
         lineText: CharSequence,
         lineTextLength: Int,
         lastIndex: Int,
-        usedWidth: Float
+        usedWidth: Float,
+        calculateNum: Int,
     ): Int = withContext(Dispatchers.Default) {
-        val num = maxCalculateNum
-        val remainder = lastIndex % num
-        val last = lastIndex / num
+        val remainder = lastIndex % calculateNum
+        val last = lastIndex / calculateNum
 
         for (i in last downTo 1) {
-            val strLastIndex = (i - 1) * num + 1
+            val strLastIndex = (i - 1) * calculateNum + 1
             val strLast = lineText.subSequence(strLastIndex, lineTextLength)
             val strLastWidth = getStaticLayout(strLast).getLineWidth(0)
 
@@ -504,14 +507,14 @@ class ExpandableTextView @JvmOverloads constructor(
                     index = strLastIndex
                 )
             } else if (strLastWidth > usedWidth) {
-                for (j in 1..<num) {
+                for (j in 1..<calculateNum) {
                     val index = strLastIndex + j
                     val str = lineText.subSequence(index, lineTextLength)
                     val strWidth = getStaticLayout(str).getLineWidth(0)
                     if (strWidth < usedWidth) {
                         return@withContext safeClip(
                             lineText = lineText,
-                            index = strLastIndex + j - 1
+                            index = index - 1
                         )
                     }
                 }
@@ -529,15 +532,15 @@ class ExpandableTextView @JvmOverloads constructor(
         lineText: CharSequence,
         lineTextLength: Int,
         lastIndex: Int,
-        usedWidth: Float
+        usedWidth: Float,
+        calculateNum: Int,
     ) = withContext(Dispatchers.Default) {
-        val num = maxCalculateNum
         val length = lineTextLength - lastIndex
-        val remainder = length % num
-        val last = length / num
+        val remainder = length % calculateNum
+        val last = length / calculateNum
 
         for (i in 0 until last) {
-            val strLastIndex = lastIndex + (i + 1) * num - 1
+            val strLastIndex = lastIndex + (i + 1) * calculateNum - 1
             val strLast = lineText.subSequence(strLastIndex, lineTextLength)
             val strLastWidth = getStaticLayout(strLast).getLineWidth(0)
 
@@ -547,7 +550,7 @@ class ExpandableTextView @JvmOverloads constructor(
                     index = strLastIndex
                 )
             } else if (strLastWidth < usedWidth) {
-                for (j in 1..<num) {
+                for (j in 1..<calculateNum) {
                     val index = strLastIndex - j
                     val str = lineText.subSequence(index, lineTextLength)
                     val strWidth = getStaticLayout(str).getLineWidth(0)
