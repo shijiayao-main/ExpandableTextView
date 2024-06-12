@@ -9,6 +9,7 @@ import android.text.SpannableStringBuilder
 import android.text.StaticLayout
 import android.text.method.LinkMovementMethod
 import android.util.AttributeSet
+import android.util.Log
 import android.util.TypedValue
 import android.view.MotionEvent
 import android.view.View
@@ -24,6 +25,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.math.roundToInt
+import kotlin.time.measureTime
 
 class ExpandableTextView @JvmOverloads constructor(
     context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
@@ -342,10 +345,9 @@ class ExpandableTextView @JvmOverloads constructor(
                             } else {
                                 expandableButton.toFolded()
                             }
+                            isExceed = true
+                            expandableButton.setVisible(true)
                         }
-
-                        isExceed = true
-                        expandableButton.setVisible(true)
                         expandedText = text
 
                         // 判断协程是否需要终止
@@ -359,7 +361,9 @@ class ExpandableTextView @JvmOverloads constructor(
                         expandedText = text
                         foldedText = text
                         isExceed = false
-                        expandableButton.setVisible(false)
+                        withContext(Dispatchers.Main) {
+                            expandableButton.setVisible(false)
+                        }
                     }
                 }
 
@@ -402,7 +406,10 @@ class ExpandableTextView @JvmOverloads constructor(
 
         val newText = SpannableStringBuilder()
         if (currentWidth > measuredWidth) {
-            val endIndex = getEndTextIndex(lineText = lineTextSpannable, usedWidth = expandableIconMarginLeft + expandableButtonWidth)
+            val endIndex = getEndTextIndex(
+                lineText = lineTextSpannable,
+                usedWidth = expandableIconMarginLeft + expandableButtonWidth
+            )
             foldedLastLineWidth = getStaticLayout(
                 lineTextSpannable.subSequence(
                     0,
@@ -421,24 +428,44 @@ class ExpandableTextView @JvmOverloads constructor(
         foldedText = newText
     }
 
+    /**
+     * @return 返回需要被裁剪掉的文字的序号
+     */
     private suspend fun getEndTextIndex(lineText: CharSequence, usedWidth: Float): Int {
-        return withContext(Dispatchers.IO) {
-            for (i in lineText.length - 1 downTo 0) {
-                val str = lineText.subSequence(i, lineText.length)
-                val strWidth = getStaticLayout(str).getLineWidth(0)
-                if (strWidth >= usedWidth) {
-                    if (i > 1) {
-                        val secondChar = lineText[i]
-                        val firstChar = lineText[i - 1]
-                        if (Character.isSurrogatePair(firstChar, secondChar)) {
-                            return@withContext i - 1
-                        }
-                    }
-                    return@withContext i
+        val result: Int
+        val functionDuration = measureTime {
+            result = withContext(Dispatchers.Default) {
+                val lineTextLength = lineText.length
+                if (lineTextLength <= 0) {
+                    return@withContext lineTextLength
                 }
+                val lineWidth = getStaticLayout(lineText).getLineWidth(0)
+                val averageTextWidth: Float = lineWidth / lineTextLength
+                val lastIndex: Int = if (averageTextWidth > 0) {
+                    val index = ((usedWidth / averageTextWidth).roundToInt() - 3).coerceAtLeast(1)
+                    lineTextLength - index
+                } else {
+                    lineTextLength - 1
+                }
+                for (i in lastIndex downTo 0) {
+                    val str = lineText.subSequence(i, lineTextLength)
+                    val strWidth = getStaticLayout(str).getLineWidth(0)
+                    if (strWidth >= usedWidth) {
+                        if (i > 1) {
+                            val secondChar = lineText[i]
+                            val firstChar = lineText[i - 1]
+                            if (Character.isSurrogatePair(firstChar, secondChar)) {
+                                return@withContext i - 1
+                            }
+                        }
+                        return@withContext i
+                    }
+                }
+                return@withContext lineTextLength - 1
             }
-            return@withContext lineText.length - 1
         }
+        Log.d(TAG, "getEndTextIndex: duration: $functionDuration, result: $result")
+        return result
     }
 
     private fun getStaticLayout(text: CharSequence): StaticLayout {
