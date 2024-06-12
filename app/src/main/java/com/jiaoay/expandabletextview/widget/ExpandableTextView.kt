@@ -34,6 +34,7 @@ class ExpandableTextView @JvmOverloads constructor(
 
     companion object {
         private const val TAG = "ExpandableTextView"
+        private const val maxCalculateNum = 8
     }
 
     private val textView: AppCompatTextView = AppCompatTextView(context).apply {
@@ -442,31 +443,167 @@ class ExpandableTextView @JvmOverloads constructor(
                 val lineWidth = getStaticLayout(lineText).getLineWidth(0)
                 val averageTextWidth: Float = lineWidth / lineTextLength
                 val lastIndex: Int = if (averageTextWidth > 0) {
-                    val index = ((usedWidth / averageTextWidth).roundToInt() - 3).coerceAtLeast(1)
+                    val index = ((usedWidth / averageTextWidth).roundToInt()).coerceAtLeast(1)
                     lineTextLength - index
                 } else {
                     lineTextLength - 1
                 }
-                for (i in lastIndex downTo 0) {
-                    val str = lineText.subSequence(i, lineTextLength)
+
+                if (lastIndex < lineTextLength) {
+                    val str = lineText.subSequence(lastIndex, lineTextLength)
                     val strWidth = getStaticLayout(str).getLineWidth(0)
-                    if (strWidth >= usedWidth) {
-                        if (i > 1) {
-                            val secondChar = lineText[i]
-                            val firstChar = lineText[i - 1]
-                            if (Character.isSurrogatePair(firstChar, secondChar)) {
-                                return@withContext i - 1
-                            }
-                        }
-                        return@withContext i
+                    return@withContext if (strWidth == usedWidth) {
+                        lastIndex
+                    } else if (strWidth > usedWidth) {
+                        calculateWhenMore(
+                            lineText = lineText,
+                            lineTextLength = lineTextLength,
+                            lastIndex = lastIndex,
+                            usedWidth = usedWidth
+                        )
+                    } else {
+                        calculateWhenLess(
+                            lineText = lineText,
+                            lineTextLength = lineTextLength,
+                            lastIndex = lastIndex,
+                            usedWidth = usedWidth
+                        )
                     }
+                } else {
+                    return@withContext calculateWhenLess(
+                        lineText = lineText,
+                        lineTextLength = lineTextLength,
+                        lastIndex = lastIndex,
+                        usedWidth = usedWidth
+                    )
                 }
-                return@withContext lineTextLength - 1
             }
         }
         Log.d(TAG, "getEndTextIndex: duration: $functionDuration, result: $result")
         return result
     }
+
+    private suspend fun calculateWhenLess(
+        lineText: CharSequence,
+        lineTextLength: Int,
+        lastIndex: Int,
+        usedWidth: Float
+    ): Int = withContext(Dispatchers.Default) {
+        val num = maxCalculateNum
+        val remainder = lastIndex % num
+        val last = lastIndex / num
+
+        for (i in last downTo 1) {
+            val strLastIndex = (i - 1) * num + 1
+            val strLast = lineText.subSequence(strLastIndex, lineTextLength)
+            val strLastWidth = getStaticLayout(strLast).getLineWidth(0)
+
+            if (strLastWidth == usedWidth) {
+                return@withContext safeClip(
+                    lineText = lineText,
+                    index = strLastIndex
+                )
+            } else if (strLastWidth > usedWidth) {
+                for (j in 1..<num) {
+                    val index = strLastIndex + j
+                    val str = lineText.subSequence(index, lineTextLength)
+                    val strWidth = getStaticLayout(str).getLineWidth(0)
+                    if (strWidth < usedWidth) {
+                        return@withContext safeClip(
+                            lineText = lineText,
+                            index = strLastIndex + j - 1
+                        )
+                    }
+                }
+            }
+        }
+        return@withContext defaultCalculate(
+            lineText = lineText,
+            lineTextLength = lineTextLength,
+            remainder = remainder,
+            usedWidth = usedWidth
+        )
+    }
+
+    private suspend fun calculateWhenMore(
+        lineText: CharSequence,
+        lineTextLength: Int,
+        lastIndex: Int,
+        usedWidth: Float
+    ) = withContext(Dispatchers.Default) {
+        val num = maxCalculateNum
+        val length = lineTextLength - lastIndex
+        val remainder = length % num
+        val last = length / num
+
+        for (i in 0 until last) {
+            val strLastIndex = lastIndex + (i + 1) * num - 1
+            val strLast = lineText.subSequence(strLastIndex, lineTextLength)
+            val strLastWidth = getStaticLayout(strLast).getLineWidth(0)
+
+            if (strLastWidth == usedWidth) {
+                return@withContext safeClip(
+                    lineText = lineText,
+                    index = strLastIndex
+                )
+            } else if (strLastWidth < usedWidth) {
+                for (j in 1..<num) {
+                    val index = strLastIndex - j
+                    val str = lineText.subSequence(index, lineTextLength)
+                    val strWidth = getStaticLayout(str).getLineWidth(0)
+                    if (strWidth >= usedWidth) {
+                        return@withContext safeClip(
+                            lineText = lineText,
+                            index = index
+                        )
+                    }
+                }
+            }
+        }
+        return@withContext defaultCalculate(
+            lineText = lineText,
+            lineTextLength = lineTextLength,
+            remainder = remainder,
+            usedWidth = usedWidth
+        )
+    }
+
+    private suspend fun defaultCalculate(
+        lineText: CharSequence,
+        lineTextLength: Int,
+        remainder: Int,
+        usedWidth: Float
+    ): Int = withContext(Dispatchers.Default) {
+        if (remainder != 0) {
+            for (i in 0..remainder) {
+                val index = lineTextLength - i
+                val str = lineText.subSequence(index, lineTextLength)
+                val strWidth = getStaticLayout(str).getLineWidth(0)
+                if (strWidth >= usedWidth) {
+                    return@withContext safeClip(
+                        lineText = lineText,
+                        index = index
+                    )
+                }
+            }
+        }
+        return@withContext lineTextLength - 1
+    }
+
+    private fun safeClip(
+        lineText: CharSequence,
+        index: Int
+    ): Int {
+        if (index > 1) {
+            val secondChar = lineText[index]
+            val firstChar = lineText[index - 1]
+            if (Character.isSurrogatePair(firstChar, secondChar)) {
+                return index - 1
+            }
+        }
+        return index
+    }
+
 
     private fun getStaticLayout(text: CharSequence): StaticLayout {
         val width = measuredWidth - paddingLeft - paddingRight
