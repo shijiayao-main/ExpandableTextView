@@ -32,52 +32,36 @@ class MainActivity : AppCompatActivity() {
                 expandIconResource = R.drawable.ic_launcher_background,
                 foldIconResource = R.drawable.ic_launcher_background,
             ),
-            DefaultDataInfo,
             ExpandableTextDataInfo(
                 text = getString(R.string.test1),
                 expandIconResource = R.drawable.ic_launcher_background,
                 foldIconResource = R.drawable.ic_launcher_background,
             ),
-            DefaultDataInfo,
-            DefaultDataInfo,
             ExpandableTextDataInfo2(
                 text = getString(R.string.test1),
                 expandText = "[我喊你一声你敢点我吗]",
                 foldText = "[?真点啊!]"
             ),
-            DefaultDataInfo,
-            DefaultDataInfo,
             ExpandableTextDataInfo2(
                 text = getString(R.string.test2),
                 expandText = "[我喊你一声你敢点我吗]",
                 foldText = "[?真点啊!]"
             ),
-            DefaultDataInfo,
             ExpandableTextDataInfo(
                 text = getString(R.string.test3)
             ),
-            DefaultDataInfo,
-            DefaultDataInfo,
-            DefaultDataInfo,
             ExpandableTextDataInfo2(
                 text = getString(R.string.test4)
             ),
-            DefaultDataInfo,
             ExpandableTextDataInfo(
                 text = getString(R.string.test5)
             ),
-            DefaultDataInfo,
-            DefaultDataInfo,
-            DefaultDataInfo,
             ExpandableTextDataInfo2(
                 text = getString(R.string.test6)
             ),
-            DefaultDataInfo,
-            DefaultDataInfo,
             ExpandableTextDataInfo2(
                 text = getString(R.string.test7)
             ),
-            DefaultDataInfo,
         )
 
         adapter.itemReset(list = list)

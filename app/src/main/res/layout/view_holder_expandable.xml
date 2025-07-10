@@ -15,7 +15,8 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="20dp"
-        app:lineSpacingExtra="2dp">
+        app:lineSpacingExtra="2dp"
+        app:maxExpandLine="2">
 
         <com.jiaoay.expandabletextview.widget.ExpandableIcon
             android:id="@+id/expandableIcon"

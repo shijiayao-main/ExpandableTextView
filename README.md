@@ -6,7 +6,9 @@
 
 下面是截图，具体用法见MainActivity
 
-> ![Screenshot_20250710_232142.png](doc/Screenshot_20250710_232142.png)
+> ![Screenshot_20250710_233743.png](doc/Screenshot_20250710_233743.png)
+
+> ![Screenshot_20250710_233730.png](doc/Screenshot_20250710_233730.png)
 
 ## 如何使用
 
@@ -48,4 +50,36 @@ XML中
             android:layout_height="15dp"
             android:scaleType="centerInside" />
     </com.jiaoay.expandabletextview.widget.ExpandableTextView>
+```
+
+当前支持的一些属性
+```xml
+<resources>
+    <attr name="maxExpandLine" format="integer" />
+    <attr name="drawBorder" format="boolean" />
+    <attr name="textColor" format="color" />
+    <attr name="textSize" format="dimension" />
+
+    <declare-styleable name="ExpandableTextView">
+        <attr name="maxExpandLine" />
+        <attr name="expandedIconMarginLeft" format="dimension" />
+        <attr name="lineSpacingExtra" format="dimension" />
+        <attr name="lineSpacingMultiplier" format="float" />
+        <attr name="defaultExpanded" format="boolean" />
+        <attr name="textColor" />
+        <attr name="textSize" />
+    </declare-styleable>
+
+    <declare-styleable name="ExpandableIcon">
+        <attr name="expandIcon" format="reference" />
+        <attr name="foldIcon" format="reference" />
+    </declare-styleable>
+
+    <declare-styleable name="ExpandableText">
+        <attr name="expandText" format="string" />
+        <attr name="expandTextColor" format="color" />
+        <attr name="foldText" format="string" />
+        <attr name="foldTextColor" format="color" />
+    </declare-styleable>
+</resources>
 ```
