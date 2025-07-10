@@ -306,10 +306,10 @@ class ExpandableTextView @JvmOverloads constructor(
     private fun Rect.xYInIconRect(x: Float, y: Float): Boolean {
         val isLegal = left < right && top < bottom
         return isLegal &&
-            x >= (left - 10.dp2px) &&
-            x < (right + 10.dp2px) &&
-            y >= (top - 10.dp2px) &&
-            y < (bottom + 10.dp2px)
+                x >= (left - 10.dp2px) &&
+                x < (right + 10.dp2px) &&
+                y >= (top - 10.dp2px) &&
+                y < (bottom + 10.dp2px)
     }
 
     private var expandedLastLineWidth = 0f
@@ -442,6 +442,7 @@ class ExpandableTextView @JvmOverloads constructor(
                 val lineWidth = getStaticLayout(lineText).getLineWidth(0)
                 val averageTextWidth: Float = lineWidth / lineTextLength
                 val lastIndex: Int = if (averageTextWidth > 0) {
+                    // 根据已使用的宽度和粗略计算出的文字宽度, 估算出大致的截取位置
                     val index = ((usedWidth / averageTextWidth).roundToInt()).coerceAtLeast(3)
                     lineTextLength - index
                 } else {
@@ -457,10 +458,11 @@ class ExpandableTextView @JvmOverloads constructor(
                         8
                     }
                 }
-
+//                Log.d(TAG, "getEndTextIndex: usedWidth: $usedWidth, lineTextLength: $lineTextLength, lastIndex: $lastIndex, lineWidth: $lineWidth, averageTextWidth: $averageTextWidth, calculateNum: $calculateNum")
                 if (lastIndex < lineTextLength) {
                     val str = lineText.subSequence(lastIndex, lineTextLength)
                     val strWidth = getStaticLayout(str).getLineWidth(0)
+//                    Log.d(TAG, "getEndTextIndex: strWidth: $strWidth, usedWidth: $usedWidth")
                     if (strWidth == usedWidth) {
                         return@withContext lastIndex
                     } else if (strWidth > usedWidth) {
@@ -482,7 +484,7 @@ class ExpandableTextView @JvmOverloads constructor(
                 )
             }
         }
-        Log.d(TAG, "getEndTextIndex: text: ${lineText.substring(0, lineText.length.coerceAtMost(10))}, duration: $functionDuration, result: $result")
+        Log.d(TAG, "getEndTextIndex: text: '${lineText.substring(0, lineText.length)}', duration: $functionDuration, result: $result")
         return result
     }
 
@@ -507,10 +509,16 @@ class ExpandableTextView @JvmOverloads constructor(
                     index = strLastIndex
                 )
             } else if (strLastWidth > usedWidth) {
-                for (j in 1..<calculateNum) {
+                val endJ = if (i == last) {
+                    lineTextLength - strLastIndex
+                } else {
+                    calculateNum
+                }
+                for (j in 1..<endJ) {
                     val index = strLastIndex + j
                     val str = lineText.subSequence(index, lineTextLength)
                     val strWidth = getStaticLayout(str).getLineWidth(0)
+//                    Log.d(TAG, "calculateWhenLess: index: $index, lineTextLength: $lineTextLength, strLastIndex: $strLastIndex, str: '$str', strWidth: $strWidth, usedWidth: $usedWidth")
                     if (strWidth < usedWidth) {
                         return@withContext safeClip(
                             lineText = lineText,
@@ -519,6 +527,7 @@ class ExpandableTextView @JvmOverloads constructor(
                     }
                 }
             }
+//            Log.d(TAG, "calculateWhenLess: ")
         }
         return@withContext defaultCalculate(
             lineText = lineText,

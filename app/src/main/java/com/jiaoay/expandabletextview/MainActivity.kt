@@ -74,6 +74,9 @@ class MainActivity : AppCompatActivity() {
             ),
             DefaultDataInfo,
             DefaultDataInfo,
+            ExpandableTextDataInfo2(
+                text = getString(R.string.test7)
+            ),
             DefaultDataInfo,
         )
 
