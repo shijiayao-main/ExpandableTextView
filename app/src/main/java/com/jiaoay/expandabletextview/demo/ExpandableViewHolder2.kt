@@ -1,6 +1,7 @@
 package com.jiaoay.expandabletextview.demo
 
 import android.content.Context
+import android.view.View
 import com.jiaoay.expandabletextview.databinding.ViewHolderExpandable2Binding
 
 class ExpandableViewHolder2(
@@ -11,6 +12,13 @@ class ExpandableViewHolder2(
     binding.root
 ) {
     override fun setData(data: ExpandableTextDataInfo2) {
+        if (data.label.isNotEmpty()) {
+            binding.label.visibility = View.VISIBLE
+            binding.label.text = data.label
+        } else {
+            binding.label.visibility = View.GONE
+        }
+
         binding.text.setText(
             text = data.text,
             isExpanded = data.isExpanded

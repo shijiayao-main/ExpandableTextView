@@ -5,11 +5,12 @@ import com.jiaoay.expandabletextview.databinding.ViewHolderDefaultBinding
 
 class DefaultViewHolder(
     context: Context,
-    binding: ViewHolderDefaultBinding
-) : AbstractListViewHolder<DefaultDataInfo>(
+    private val binding: ViewHolderDefaultBinding
+) : AbstractListViewHolder<SectionHeaderInfo>(
     context,
     binding.root
 ) {
-    override fun setData(data: DefaultDataInfo) {
+    override fun setData(data: SectionHeaderInfo) {
+        binding.title.text = data.title
     }
 }

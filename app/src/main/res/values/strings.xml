@@ -7,4 +7,20 @@
     <string name="test5">A food delivery rider in a bright yellow raincoat struggles to ride an electric scooter through a torrential downpour. Raindrops blur the camera lens, streets are flooded with reflective puddles, and lightning flashes across dark stormy skies. The delivery box is tightly wrapped in waterproof fabric. Neon signs from nearby shops glow through the rain, creating bokeh light effects. Cinematic dark tones, hyper-realistic rain simulation, dynamic camera movement.</string>
     <string name="test6">Hear👻😄🤓👻😄∑˙œ∑ª˙ƒ∑œ•∂ßç√∫˙¢∑˙œ∑ª˙ƒ∑œ•∂ßç√∫˙¢🤓👻😄一歩踏み出す 二度∑˙œ∑ª˙ƒ∑œ•∂ßç√∫˙¢∑˙œ∑ª˙ƒ∑œ•∂ßç√∫˙¢と戻れぬ !#$^ƒßå©åƒßƒßå∂ç≈Ωƒ∑˙œ∑ª˙ƒ∑œ•∂ßç√∫˙¢**@#$#*@($^@三千世界の 血の海へ 一歩踏み出す 二度と戻れぬ 三千世界の 血の海へ 🤓👻😄🤓👻😄https://github.com/shijiayao-main/ExpandableTextView🤓👻😄🤓👻😄🤓👻 me! \nKing👻😄🤓👻😄🤓👻😄🤓👻😄🤓9012345678901234567890123456789https://github.com/shijiayao-main/ExpandableTextView0123456789\n01234567∫˙¢**@#$#*@($^@三千世界の 血の海へ 8901234567890123456789012345678901234\n5678901234567👻😄🤓👻😄🤓👻😄🤓👻 of Infinite Space!👻😄🤓👻😄🤓\n👻😄🤓👻 of Earthquakes! \nThe Vanquisher of Terror! \nThe Creator一歩踏み出す 二度と戻れぬ 三千世界の 血の海へ \n一歩踏み出す \n二度と戻れぬ \n三千世界の \n血の海へ  of Panic! \nDestroyer! 😄🤓👻😄🤓👻😄🤓👻😄🤓👻 \nPlanetmover! </string>
     <string name="test7">Extreme downpour, heavy rain hitting subway station stairs, crowds with black umbrellas rushing, neon station signs blurred by rain, reflections on wet pavement, cinematic lighting, hyper-realistic, dynamic composition, urban stress, 8K detailed textures</string>
+
+    <!-- Demo section header titles -->
+    <string name="header_icon_button">图标按钮</string>
+    <string name="header_text_button">文字按钮</string>
+    <string name="header_special">特殊场景验证</string>
+
+    <!-- Demo content strings -->
+    <string name="demo_short">这是一段简短的文字，未超过最大行数，不会显示展开收起按钮。</string>
+    <string name="demo_long_zh">ExpandableTextView 是一个支持展开收起的 Android 自定义控件。当文字内容超过设定的最大行数时，多余内容将被自动折叠，并在最后一行末尾显示展开按钮。点击按钮后可以查看完整内容，再次点击可重新折叠。控件支持图标和文字两种按钮形式，支持自定义展开行数、按钮颜色和图标资源等属性。</string>
+    <string name="demo_long_en">ExpandableTextView is a custom Android widget that supports expanding and collapsing long text content. When text exceeds the configured maximum number of lines, the overflow is hidden and an expand button appears at the end of the truncation line. Tapping the button toggles between the collapsed and fully expanded states. The widget handles rich text, emoji surrogate pairs, and concurrent setText calls correctly.</string>
+    <string name="demo_emoji">今天遇到了很多可爱的小动物 🐶🐱🐰🐻🦊🐼，心情变得特别好 😊🎉！下午和朋友去了咖啡馆 ☕🍰 聊了好多有趣的事情，晚上打算一起看电影 🎬🍿，期待明天也是充满活力的一天 🌈⭐。这段文字混合了中文与 emoji，用于验证代理对截断逻辑的正确性。</string>
+    <string name="demo_default_expanded">这段文字的初始状态为「已展开」，点击收起按钮可以将其折叠。在 RecyclerView 中滑动离开再回来，展开状态应当保持不变，不会被重置为初始值。这里写入了足够多的内容以确保超出最大显示行数，让收起按钮能够正常显示，供测试初始展开状态功能使用。</string>
+    <string name="demo_spannable_label">富文本 SpannableString</string>
+    <string name="demo_color_span_label">彩色文字 Span</string>
+    <string name="demo_unicode_label">Unicode 特殊字符（Zalgo）</string>
+    <string name="demo_mixed_label">Emoji + URL 混合</string>
 </resources>

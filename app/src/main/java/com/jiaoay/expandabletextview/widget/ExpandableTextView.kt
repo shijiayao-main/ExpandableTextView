@@ -9,7 +9,6 @@ import android.text.SpannableStringBuilder
 import android.text.StaticLayout
 import android.text.method.LinkMovementMethod
 import android.util.AttributeSet
-import android.util.Log
 import android.util.TypedValue
 import android.view.MotionEvent
 import android.view.View
@@ -22,19 +21,36 @@ import com.jiaoay.expandabletextview.R
 import com.jiaoay.expandabletextview.dp2px
 import com.jiaoay.expandabletextview.scopeOrNull
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
-import kotlin.time.measureTime
 
 class ExpandableTextView @JvmOverloads constructor(
     context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
 ) : ViewGroup(context, attrs, defStyleAttr), OnClickListener {
 
-    companion object {
-        private const val TAG = "ExpandableTextView"
-    }
+    // tracks the currently running setText coroutine so we can cancel it on new calls
+    private var currentTextJob: Job? = null
+
+    // pending Runnable posted via post{} — kept so it can be cancelled by a subsequent setText call
+    private var pendingSetTextRunnable: Runnable? = null
+
+    // tracks which text state is currently set on textView to avoid redundant setText in onMeasure
+    private var lastTextViewIsExpanded: Boolean? = null
+
+    private data class TextComputationCache(
+        val textRef: CharSequence,
+        val width: Int,
+        val isExceed: Boolean,
+        val expandedLastLineWidth: Float = 0f,
+        val foldedLastLineWidth: Float = 0f,
+        val foldedText: CharSequence? = null
+    )
+    // cached result of the last background computation for this view instance
+    private var textComputationCache: TextComputationCache? = null
 
     private val textView: AppCompatTextView = AppCompatTextView(context).apply {
         movementMethod = LinkMovementMethod.getInstance()
@@ -97,7 +113,7 @@ class ExpandableTextView @JvmOverloads constructor(
                 R.styleable.ExpandableTextView_textSize,
                 12f.dp2px
             )
-            typedArray.getDimension(
+            expandableIconMarginLeft = typedArray.getDimension(
                 R.styleable.ExpandableTextView_expandedIconMarginLeft,
                 8f.dp2px
             )
@@ -179,7 +195,10 @@ class ExpandableTextView @JvmOverloads constructor(
 
         if (isExpanded) {
             // 应展示为展开状态
-            textView.setText(expandedText, TextView.BufferType.SPANNABLE)
+            if (lastTextViewIsExpanded != true) {
+                textView.setText(expandedText, TextView.BufferType.SPANNABLE)
+                lastTextViewIsExpanded = true
+            }
             measureChildWithMargins(
                 textView,
                 widthMeasureSpec,
@@ -199,7 +218,10 @@ class ExpandableTextView @JvmOverloads constructor(
             }
         } else {
             // 应展示为收起状态
-            textView.setText(foldedText, TextView.BufferType.SPANNABLE)
+            if (lastTextViewIsExpanded != false) {
+                textView.setText(foldedText, TextView.BufferType.SPANNABLE)
+                lastTextViewIsExpanded = false
+            }
             measureChildWithMargins(
                 textView,
                 widthMeasureSpec,
@@ -258,58 +280,62 @@ class ExpandableTextView @JvmOverloads constructor(
     }
 
     override fun dispatchTouchEvent(ev: MotionEvent?): Boolean {
-        ev?.let {
-            if (isClickIcon(it)) {
-                return true
+        ev ?: return super.dispatchTouchEvent(null)
+        when (ev.action) {
+            MotionEvent.ACTION_DOWN -> {
+                lastX = ev.getX(0)
+                lastY = ev.getY(0)
+                if (imageRect.xYInIconRect(lastX, lastY)) {
+                    consumedDown = true
+                    return true
+                }
+            }
+            MotionEvent.ACTION_MOVE -> {
+                if (consumedDown) return true
+            }
+            MotionEvent.ACTION_UP -> {
+                if (consumedDown) {
+                    consumedDown = false
+                    // only treat as a click if both DOWN and UP landed inside the icon area
+                    if (imageRect.xYInIconRect(lastX, lastY) &&
+                        imageRect.xYInIconRect(ev.getX(0), ev.getY(0))
+                    ) {
+                        if (isExceed) {
+                            if (isExpanded) {
+                                isExpanded = false
+                                expandableButton.toExpanded()
+                            } else {
+                                isExpanded = true
+                                expandableButton.toFolded()
+                            }
+                            requestLayout()
+                        }
+                        cancelLongPress()
+                    }
+                    // always consume UP when we owned the DOWN, so children don't get
+                    // an orphaned UP event
+                    return true
+                }
+            }
+            MotionEvent.ACTION_CANCEL -> {
+                consumedDown = false
             }
         }
         return super.dispatchTouchEvent(ev)
     }
 
+    private var consumedDown = false
     private var lastX: Float = -1f
     private var lastY: Float = -1f
-
-    private fun isClickIcon(event: MotionEvent): Boolean {
-        when (event.action) {
-            MotionEvent.ACTION_DOWN -> {
-                lastX = event.getX(0)
-                lastY = event.getY(0)
-                if (imageRect.xYInIconRect(lastX, lastY)) {
-                    return true
-                }
-            }
-
-            MotionEvent.ACTION_UP -> {
-                if (imageRect.xYInIconRect(lastX, lastY) && imageRect.xYInIconRect(
-                        event.getX(0),
-                        event.getY(0)
-                    )
-                ) {
-                    if (isExceed) {
-                        if (isExpanded) {
-                            isExpanded = false
-                            expandableButton.toExpanded()
-                        } else {
-                            isExpanded = true
-                            expandableButton.toFolded()
-                        }
-                        requestLayout()
-                    }
-                    cancelLongPress()
-                    return true
-                }
-            }
-        }
-        return false
-    }
+    private val touchSlop = 10.dp2px
 
     private fun Rect.xYInIconRect(x: Float, y: Float): Boolean {
         val isLegal = left < right && top < bottom
         return isLegal &&
-                x >= (left - 10.dp2px) &&
-                x < (right + 10.dp2px) &&
-                y >= (top - 10.dp2px) &&
-                y < (bottom + 10.dp2px)
+                x >= (left - touchSlop) &&
+                x < (right + touchSlop) &&
+                y >= (top - touchSlop) &&
+                y < (bottom + touchSlop)
     }
 
     private var expandedLastLineWidth = 0f
@@ -321,7 +347,17 @@ class ExpandableTextView @JvmOverloads constructor(
         isExpanded: Boolean = false,
         expandedListener: ((Boolean) -> Unit)? = null
     ) {
+        this@ExpandableTextView.expandedListener = expandedListener
+        lastTextViewIsExpanded = null
+
+        // Cancel any pending post and running job immediately to avoid queue pile-up
+        pendingSetTextRunnable?.let { removeCallbacks(it) }
+        pendingSetTextRunnable = null
+        currentTextJob?.cancel()
+        currentTextJob = null
+
         if (text.isEmpty()) {
+            textComputationCache = null
             expandedText = null
             foldedText = null
             isExceed = false
@@ -332,64 +368,139 @@ class ExpandableTextView @JvmOverloads constructor(
             this.expandedListener = null
             return
         }
-        post {
-            context.scopeOrNull?.launch {
-                val job = launch(Dispatchers.Default) {
-                    this@ExpandableTextView.isExpanded = isExpanded
 
-                    val staticLayout = getStaticLayout(text = text)
-                    if (staticLayout.lineCount > maxExpandLineNum) {
-                        withContext(Dispatchers.Main) {
-                            if (isExpanded.not()) {
-                                expandableButton.toExpanded()
-                            } else {
-                                expandableButton.toFolded()
-                            }
-                            isExceed = true
-                            expandableButton.setVisible(true)
-                        }
+        if (measuredWidth > 0) {
+            // View is already measured (e.g. reused from RecyclerView pool) — skip post()
+            launchTextComputation(text, isExpanded)
+        } else {
+            val runnable = Runnable {
+                pendingSetTextRunnable = null
+                launchTextComputation(text, isExpanded)
+            }
+            pendingSetTextRunnable = runnable
+            post(runnable)
+        }
+    }
+
+    private fun launchTextComputation(text: CharSequence, isExpandedState: Boolean) {
+        val currentWidth = measuredWidth
+        val cache = textComputationCache
+
+        // Fast path: same text object and same width — reuse cached computation without background work
+        if (cache != null && cache.textRef === text && cache.width == currentWidth) {
+            applyComputationResult(text, isExpandedState, cache)
+            return
+        }
+
+        currentTextJob = context.scopeOrNull?.launch {
+            this@ExpandableTextView.isExpanded = isExpandedState
+
+            val calcJob = launch(Dispatchers.Default) {
+                val staticLayout = getStaticLayout(text = text)
+                if (staticLayout.lineCount > maxExpandLineNum) {
+                    val calcResult = calculateText(staticLayout = staticLayout, text = text)
+
+                    // 判断协程是否需要终止
+                    ensureActive()
+
+                    // Apply all computed state atomically on Main so that no layout pass
+                    // can see a partially-updated state (e.g. isExceed=true but foldedText=null).
+                    withContext(Dispatchers.Main) {
                         expandedText = text
-
-                        // 判断协程是否需要终止
-                        ensureActive()
-
-                        calculateText(
-                            staticLayout = staticLayout,
-                            text = text
+                        expandedLastLineWidth = calcResult.expandedLastLineWidth
+                        foldedLastLineWidth = calcResult.foldedLastLineWidth
+                        foldedText = calcResult.foldedText
+                        if (isExpandedState.not()) {
+                            expandableButton.toExpanded()
+                        } else {
+                            expandableButton.toFolded()
+                        }
+                        isExceed = true
+                        expandableButton.setVisible(true)
+                        textComputationCache = TextComputationCache(
+                            textRef = text,
+                            width = currentWidth,
+                            isExceed = true,
+                            expandedLastLineWidth = calcResult.expandedLastLineWidth,
+                            foldedLastLineWidth = calcResult.foldedLastLineWidth,
+                            foldedText = calcResult.foldedText
                         )
-                    } else {
+                    }
+                } else {
+                    // Update all shared state on Main to avoid data races with onMeasure
+                    withContext(Dispatchers.Main) {
                         expandedText = text
                         foldedText = text
                         isExceed = false
-                        withContext(Dispatchers.Main) {
-                            expandableButton.setVisible(false)
-                        }
+                        expandableButton.setVisible(false)
+                        textComputationCache = TextComputationCache(
+                            textRef = text,
+                            width = currentWidth,
+                            isExceed = false
+                        )
                     }
                 }
+            }
 
-                job.join()
+            calcJob.join()
+            if (isActive) {
                 textView.setText(text, TextView.BufferType.SPANNABLE)
                 requestLayout()
             }
         }
-        this@ExpandableTextView.expandedListener = expandedListener
     }
+
+    /**
+     * Applies a cached computation result synchronously on the main thread, skipping background work.
+     */
+    private fun applyComputationResult(text: CharSequence, isExpandedState: Boolean, cache: TextComputationCache) {
+        this.isExpanded = isExpandedState
+        expandedText = text
+        if (cache.isExceed) {
+            expandedLastLineWidth = cache.expandedLastLineWidth
+            foldedLastLineWidth = cache.foldedLastLineWidth
+            foldedText = cache.foldedText
+            isExceed = true
+            expandableButton.setVisible(true)
+            if (isExpandedState) {
+                expandableButton.toFolded()
+                textView.setText(text, TextView.BufferType.SPANNABLE)
+                lastTextViewIsExpanded = true
+            } else {
+                expandableButton.toExpanded()
+                textView.setText(cache.foldedText, TextView.BufferType.SPANNABLE)
+                lastTextViewIsExpanded = false
+            }
+        } else {
+            foldedText = text
+            isExceed = false
+            expandableButton.setVisible(false)
+            textView.setText(text, TextView.BufferType.SPANNABLE)
+            lastTextViewIsExpanded = null
+        }
+        requestLayout()
+    }
+
+    private data class TextCalculationResult(
+        val expandedLastLineWidth: Float,
+        val foldedLastLineWidth: Float,
+        val foldedText: CharSequence
+    )
 
     private suspend fun calculateText(
         staticLayout: StaticLayout,
         text: CharSequence
-    ) = withContext(Dispatchers.Default) {
-        // 获取展开状态下最后一行文字的高度以便确定收起按钮应在的位置
+    ): TextCalculationResult = withContext(Dispatchers.Default) {
+        // 获取展开状态下最后一行文字的宽度以便确定收起按钮应在的位置
         val lastLine = staticLayout.lineCount - 1
         val lastLineStart = staticLayout.getLineStart(lastLine).coerceAtMost(text.length)
         val lastLineEnd = staticLayout.getLineEnd(lastLine).coerceAtMost(text.length)
         val lastLineSpan = text.subSequence(lastLineStart, lastLineEnd)
             .removeSuffix("\r\n")
             .removeSuffix("\n")
-        val lastLineStaticLayout = getStaticLayout(lastLineSpan)
-        expandedLastLineWidth = lastLineStaticLayout.getLineWidth(0)
+        val computedExpandedLastLineWidth = measureLineWidth(lastLineSpan)
 
-        // 获取折叠状态下最后一行文字的高度以便确定展开按钮应在的位置
+        // 获取折叠状态下最后一行文字的宽度以便确定展开按钮应在的位置
         val start = staticLayout.getLineStart(maxExpandLineNum - 1).coerceAtMost(text.length)
         val end = staticLayout.getLineEnd(maxExpandLineNum - 1).coerceAtMost(text.length)
         val lineTextSpannable = text
@@ -397,95 +508,84 @@ class ExpandableTextView @JvmOverloads constructor(
             .removeSuffix("\r\n")
             .removeSuffix("\n")
 
-        val lineStaticLayout = getStaticLayout(lineTextSpannable)
-        val lineWidth = lineStaticLayout.getLineWidth(0)
+        val lineWidth = measureLineWidth(lineTextSpannable)
         val ellipsizeTextWidth = textView.paint.measureText(ellipsizeText)
-        // 获取展开按钮的宽度
         val expandableButtonWidth = expandableButton.getButtonWidth() + ellipsizeTextWidth
         val currentWidth = lineWidth + paddingLeft + expandableButtonWidth + expandableIconMarginLeft
 
         val newText = SpannableStringBuilder()
+        val computedFoldedLastLineWidth: Float
         if (currentWidth > measuredWidth) {
             val endIndex = getEndTextIndex(
                 lineText = lineTextSpannable,
                 usedWidth = expandableIconMarginLeft + expandableButtonWidth
             )
-            foldedLastLineWidth = getStaticLayout(
-                lineTextSpannable.subSequence(
-                    0,
-                    endIndex.coerceAtMost(lineTextSpannable.length)
-                )
-            ).getLineWidth(0) + ellipsizeTextWidth
+            computedFoldedLastLineWidth = measureLineWidth(
+                lineTextSpannable.subSequence(0, endIndex.coerceAtMost(lineTextSpannable.length))
+            ) + ellipsizeTextWidth
             newText.append(text.subSequence(0, start.coerceAtMost(text.length)))
                 .append(lineTextSpannable.subSequence(0, endIndex.coerceAtMost(lineTextSpannable.length)))
                 .append(ellipsizeText)
         } else {
-            foldedLastLineWidth = lineWidth + ellipsizeTextWidth
+            computedFoldedLastLineWidth = lineWidth + ellipsizeTextWidth
             newText.append(text.subSequence(0, start.coerceAtMost(text.length)))
                 .append(lineTextSpannable)
                 .append(ellipsizeText)
         }
-        foldedText = newText
+        TextCalculationResult(computedExpandedLastLineWidth, computedFoldedLastLineWidth, newText)
     }
 
     /**
      * @return 返回需要被裁剪掉的文字的序号
      */
     private suspend fun getEndTextIndex(lineText: CharSequence, usedWidth: Float): Int {
-        val result: Int
-        val functionDuration = measureTime {
-            result = withContext(Dispatchers.Default) {
-                val lineTextLength = lineText.length
-                if (lineTextLength <= 0) {
-                    return@withContext lineTextLength
-                }
-                val lineWidth = getStaticLayout(lineText).getLineWidth(0)
-                val averageTextWidth: Float = lineWidth / lineTextLength
-                val lastIndex: Int = if (averageTextWidth > 0) {
-                    // 根据已使用的宽度和粗略计算出的文字宽度, 估算出大致的截取位置
-                    val index = ((usedWidth / averageTextWidth).roundToInt()).coerceAtLeast(3)
-                    lineTextLength - index
-                } else {
-                    lineTextLength - 1
-                }
+        return withContext(Dispatchers.Default) {
+            val lineTextLength = lineText.length
+            if (lineTextLength <= 0) {
+                return@withContext lineTextLength
+            }
+            val lineWidth = measureLineWidth(lineText)
+            val averageTextWidth: Float = lineWidth / lineTextLength
+            val lastIndex: Int = if (averageTextWidth > 0) {
+                // 根据已使用的宽度和粗略计算出的文字宽度, 估算出大致的截取位置
+                val index = ((usedWidth / averageTextWidth).roundToInt()).coerceAtLeast(3)
+                lineTextLength - index
+            } else {
+                lineTextLength - 1
+            }
 
-                val calculateNum: Int = if (averageTextWidth > 10) {
+            val calculateNum: Int = if (averageTextWidth > 10) {
+                4
+            } else {
+                if (lineTextLength < 50) {
                     4
                 } else {
-                    if (lineTextLength < 50) {
-                        4
-                    } else {
-                        8
-                    }
+                    8
                 }
-//                Log.d(TAG, "getEndTextIndex: usedWidth: $usedWidth, lineTextLength: $lineTextLength, lastIndex: $lastIndex, lineWidth: $lineWidth, averageTextWidth: $averageTextWidth, calculateNum: $calculateNum")
-                if (lastIndex < lineTextLength) {
-                    val str = lineText.subSequence(lastIndex, lineTextLength)
-                    val strWidth = getStaticLayout(str).getLineWidth(0)
-//                    Log.d(TAG, "getEndTextIndex: strWidth: $strWidth, usedWidth: $usedWidth")
-                    if (strWidth == usedWidth) {
-                        return@withContext lastIndex
-                    } else if (strWidth > usedWidth) {
-                        return@withContext calculateWhenMore(
-                            lineText = lineText,
-                            lineTextLength = lineTextLength,
-                            lastIndex = lastIndex,
-                            usedWidth = usedWidth,
-                            calculateNum = calculateNum
-                        )
-                    }
-                }
-                return@withContext calculateWhenLess(
-                    lineText = lineText,
-                    lineTextLength = lineTextLength,
-                    lastIndex = lastIndex,
-                    usedWidth = usedWidth,
-                    calculateNum = calculateNum
-                )
             }
+            if (lastIndex < lineTextLength) {
+                val str = lineText.subSequence(lastIndex, lineTextLength)
+                val strWidth = measureLineWidth(str)
+                if (strWidth == usedWidth) {
+                    return@withContext lastIndex
+                } else if (strWidth > usedWidth) {
+                    return@withContext calculateWhenMore(
+                        lineText = lineText,
+                        lineTextLength = lineTextLength,
+                        lastIndex = lastIndex,
+                        usedWidth = usedWidth,
+                        calculateNum = calculateNum
+                    )
+                }
+            }
+            return@withContext calculateWhenLess(
+                lineText = lineText,
+                lineTextLength = lineTextLength,
+                lastIndex = lastIndex,
+                usedWidth = usedWidth,
+                calculateNum = calculateNum
+            )
         }
-        Log.d(TAG, "getEndTextIndex: text: '${lineText.substring(0, lineText.length)}', duration: $functionDuration, result: $result")
-        return result
     }
 
     private suspend fun calculateWhenLess(
@@ -501,7 +601,7 @@ class ExpandableTextView @JvmOverloads constructor(
         for (i in last downTo 1) {
             val strLastIndex = (i - 1) * calculateNum + 1
             val strLast = lineText.subSequence(strLastIndex, lineTextLength)
-            val strLastWidth = getStaticLayout(strLast).getLineWidth(0)
+            val strLastWidth = measureLineWidth(strLast)
 
             if (strLastWidth == usedWidth) {
                 return@withContext safeClip(
@@ -517,8 +617,7 @@ class ExpandableTextView @JvmOverloads constructor(
                 for (j in 1..<endJ) {
                     val index = strLastIndex + j
                     val str = lineText.subSequence(index, lineTextLength)
-                    val strWidth = getStaticLayout(str).getLineWidth(0)
-//                    Log.d(TAG, "calculateWhenLess: index: $index, lineTextLength: $lineTextLength, strLastIndex: $strLastIndex, str: '$str', strWidth: $strWidth, usedWidth: $usedWidth")
+                    val strWidth = measureLineWidth(str)
                     if (strWidth < usedWidth) {
                         return@withContext safeClip(
                             lineText = lineText,
@@ -527,7 +626,6 @@ class ExpandableTextView @JvmOverloads constructor(
                     }
                 }
             }
-//            Log.d(TAG, "calculateWhenLess: ")
         }
         return@withContext defaultCalculate(
             lineText = lineText,
@@ -551,7 +649,7 @@ class ExpandableTextView @JvmOverloads constructor(
         for (i in 0 until last) {
             val strLastIndex = lastIndex + (i + 1) * calculateNum - 1
             val strLast = lineText.subSequence(strLastIndex, lineTextLength)
-            val strLastWidth = getStaticLayout(strLast).getLineWidth(0)
+            val strLastWidth = measureLineWidth(strLast)
 
             if (strLastWidth == usedWidth) {
                 return@withContext safeClip(
@@ -562,7 +660,7 @@ class ExpandableTextView @JvmOverloads constructor(
                 for (j in 1..<calculateNum) {
                     val index = strLastIndex - j
                     val str = lineText.subSequence(index, lineTextLength)
-                    val strWidth = getStaticLayout(str).getLineWidth(0)
+                    val strWidth = measureLineWidth(str)
                     if (strWidth >= usedWidth) {
                         return@withContext safeClip(
                             lineText = lineText,
@@ -590,7 +688,7 @@ class ExpandableTextView @JvmOverloads constructor(
             for (i in 0..remainder) {
                 val index = lineTextLength - i
                 val str = lineText.subSequence(index, lineTextLength)
-                val strWidth = getStaticLayout(str).getLineWidth(0)
+                val strWidth = measureLineWidth(str)
                 if (strWidth >= usedWidth) {
                     return@withContext safeClip(
                         lineText = lineText,
@@ -606,7 +704,7 @@ class ExpandableTextView @JvmOverloads constructor(
         lineText: CharSequence,
         index: Int
     ): Int {
-        if (index > 1) {
+        if (index > 0 && index < lineText.length) {
             val secondChar = lineText[index]
             val firstChar = lineText[index - 1]
             if (Character.isSurrogatePair(firstChar, secondChar)) {
@@ -634,7 +732,7 @@ class ExpandableTextView @JvmOverloads constructor(
                 }
                 .setBreakStrategy(textView.breakStrategy)
                 .setHyphenationFrequency(textView.hyphenationFrequency)
-                .setAlignment(Layout.Alignment.ALIGN_CENTER)
+                .setAlignment(Layout.Alignment.ALIGN_NORMAL)
                 .setLineSpacing(textView.lineSpacingExtra, textView.lineSpacingMultiplier)
                 .build()
         } else {
@@ -642,7 +740,7 @@ class ExpandableTextView @JvmOverloads constructor(
                 text,
                 textView.paint,
                 width,
-                Layout.Alignment.ALIGN_CENTER,
+                Layout.Alignment.ALIGN_NORMAL,
                 textView.lineSpacingMultiplier,
                 textView.lineSpacingExtra,
                 true
@@ -650,12 +748,18 @@ class ExpandableTextView @JvmOverloads constructor(
         }
     }
 
+    /**
+     * Measures the width of a single-line text span using [Layout.getDesiredWidth].
+     * Much cheaper than constructing a [StaticLayout] when line-count is not needed.
+     */
+    private fun measureLineWidth(text: CharSequence): Float =
+        Layout.getDesiredWidth(text, textView.paint)
+
     private var expandableButton: BaseExpandableButton = ExpandableText(context)
 
     override fun onFinishInflate() {
         super.onFinishInflate()
 
-        // TODO:
         if (childCount > 2) {
             throw RuntimeException("only support add one child view.")
         }

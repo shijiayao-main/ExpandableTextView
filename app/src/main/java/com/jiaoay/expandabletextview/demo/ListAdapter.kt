@@ -67,19 +67,17 @@ class ListAdapter : Adapter<AbstractListViewHolder<out ListDataInfo>>() {
     override fun onBindViewHolder(holder: AbstractListViewHolder<*>, position: Int) {
         val data = safeGetData(position) ?: return
         when (data) {
+            is SectionHeaderInfo -> {
+                (holder as? DefaultViewHolder)?.setData(data)
+            }
+
             is ExpandableTextDataInfo -> {
-                (holder as? ExpandableViewHolder)?.let {
-                    holder.setData(data = data)
-                }
+                (holder as? ExpandableViewHolder)?.setData(data = data)
             }
 
             is ExpandableTextDataInfo2 -> {
-                (holder as? ExpandableViewHolder2)?.let {
-                    holder.setData(data = data)
-                }
+                (holder as? ExpandableViewHolder2)?.setData(data = data)
             }
-
-            else -> {}
         }
     }
 
